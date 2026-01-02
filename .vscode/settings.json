@@ -1,0 +1,107 @@
+{
+  // JS
+  "javascript.updateImportsOnFileMove.enabled": "always",
+
+  // JSON Settings
+  "[json]": {
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "editor.codeActionsOnSave": null
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": null
+  },
+
+  // VSCode Editor Settings
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "never",
+    "source.fixAll.stylelint": "explicit"
+  },
+
+  // Extension Settings
+  "git.rebaseWhenSync": true,
+  "git.autofetch": true,
+  "git.enableSmartCommit": true,
+
+  // Prettier Settings
+  "prettier.requireConfig": true,
+
+  // ESLint Settings
+  "eslint.validate": [
+    "javascript",
+    "typescript",
+    "javascriptreact",
+    "typescriptreact"
+  ],
+  "eslint.format.enable": true,
+
+  // Stylelint Settings
+  "css.validate": false,
+  "less.validate": false,
+  "scss.validate": false,
+  "stylelint.enable": true,
+  "stylelint.validate": [
+    "css",
+    "scss",
+    "typescript",
+    "typescriptreact"
+  ],
+
+  // Other Editor Settings
+  "markdown.extension.toc.updateOnSave": false,
+  "files.insertFinalNewline": true,
+  "editor.linkedEditing": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  // Custom User Words
+  "cSpell.words": [
+    "customizer",
+    "iconify",
+    "laravel",
+    "Problemstructuretab",
+    "showdrawer",
+    "tanstack",
+    "webcontainer"
+  ],
+
+  // Next.js Settings
+  "WillLuke.nextjs.addTypesOnSave": true,
+  "WillLuke.nextjs.hasPrompted": true,
+
+  // TypeScript Formatter
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  },
+
+  // JSON Formatting Disabled
+  "json.format.enable": false,
+
+  // Explicitly Disable JSON Language Features
+  "json.schemas": [],
+  "json.validate": false,
+  "files.autoSave": "afterDelay",
+  "workbench.colorCustomizations": {
+    "activityBar.activeBackground": "#9a040a",
+    "activityBar.background": "#9a040a",
+    "activityBar.foreground": "#e7e7e7",
+    "activityBar.inactiveForeground": "#e7e7e799",
+    "activityBarBadge.background": "#0a9b04",
+    "activityBarBadge.foreground": "#e7e7e7",
+    "commandCenter.border": "#e7e7e799",
+    "sash.hoverBorder": "#9a040a",
+    "statusBar.background": "#680307",
+    "statusBar.foreground": "#e7e7e7",
+    "statusBarItem.hoverBackground": "#9a040a",
+    "statusBarItem.remoteBackground": "#680307",
+    "statusBarItem.remoteForeground": "#e7e7e7",
+    "titleBar.activeBackground": "#680307",
+    "titleBar.activeForeground": "#e7e7e7",
+    "titleBar.inactiveBackground": "#68030799",
+    "titleBar.inactiveForeground": "#e7e7e799"
+  },
+  "peacock.color": "#680307"
+}
+

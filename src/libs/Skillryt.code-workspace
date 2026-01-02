@@ -1,0 +1,36 @@
+{
+  "folders": [
+	{
+		"path": "../.."
+	},
+	{
+		"path": "../../../kgmlmsbackend"
+	},
+	{
+		"path": "../../../kglmsfrontend"
+	}
+],
+  "settings": {
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "json.format.enable": false,
+    "workbench.colorCustomizations": {
+      "activityBar.activeBackground": "#9a040a",
+      "activityBar.background": "#9a040a",
+      "activityBar.foreground": "#e7e7e7",
+      "activityBar.inactiveForeground": "#e7e7e799",
+      "activityBarBadge.background": "#0a9b04",
+      "activityBarBadge.foreground": "#e7e7e7",
+      "commandCenter.border": "#e7e7e799",
+      "sash.hoverBorder": "#9a040a",
+      "statusBar.background": "#680307",
+      "statusBar.foreground": "#e7e7e7",
+      "statusBarItem.hoverBackground": "#9a040a",
+      "statusBarItem.remoteBackground": "#680307",
+      "statusBarItem.remoteForeground": "#e7e7e7",
+      "titleBar.activeBackground": "#680307",
+      "titleBar.activeForeground": "#e7e7e7",
+      "titleBar.inactiveBackground": "#68030799",
+      "titleBar.inactiveForeground": "#e7e7e799"
+    }
+  }
+}

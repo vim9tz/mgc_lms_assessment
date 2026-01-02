@@ -1,0 +1,321 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --border-radius: var(--mui-shape-borderRadius);
+  --border-color: var(--mui-palette-divider);
+  --primary-color: var(--mui-palette-primary-main);
+  --background-color: var(--mui-palette-background-default);
+  --background-color-rgb: var(--mui-palette-background-paperChannel);
+  --header-height: 54px;
+  --header-z-index: var(--mui-zIndex-appBar);
+  --footer-z-index: 10;
+  --customizer-z-index: var(--mui-zIndex-drawer);
+  --search-z-index: var(--mui-zIndex-tooltip);
+  --drawer-z-index: var(--mui-zIndex-drawer);
+  --backdrop-color: rgb(var(--mui-mainColorChannels-light) / 0.5);
+  --mui-mainColorChannels-shadow: var(--mui-mainColorChannels-lightShadow);
+}
+
+[data-mui-color-scheme='dark'] {
+  --backdrop-color: rgb(23 25 37 / 0.6);
+  --mui-mainColorChannels-shadow: var(--mui-mainColorChannels-darkShadow);
+}
+
+*,
+::before,
+::after {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  border-width: 0;
+  border-style: solid;
+  border-color: theme('borderColor.DEFAULT', currentColor);
+}
+
+html {
+  display: flex;
+  inline-size: 100%;
+  min-block-size: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul:not([class]) {
+  margin-block: 1rem;
+  padding-inline-start: 40px;
+}
+
+/* width */
+::-webkit-scrollbar {
+  inline-size: 7px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #1e1e1ecb;
+  border-radius: 5px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #1e1e1e;
+}
+/*! Do not remove the following styles */
+/*
+  Fix the popout / submenu closing issue when using hover trigger to open the menu and using
+  perfectscrollbar where the bridge create with safe polygon by floating ui was not working
+*/
+[data-floating-ui-safe-polygon] .scrollbar-container {
+  pointer-events: auto;
+}
+[data-floating-ui-safe-polygon] .scrollbar-container .ps__rail-y {
+  pointer-events: none;
+}
+
+.ps__rail-y {
+  inset-inline-end: 0 !important;
+  inset-inline-start: auto !important;
+  & .ps__thumb-y {
+    inset-inline-end: 3px !important;
+    inset-inline-start: auto !important;
+    background-color: var(--mui-palette-divider);
+    inline-size: 6px;
+    &:hover,
+    &:focus,
+    &.ps--clicking {
+      background-color: var(--mui-palette-action-disabled) !important;
+    }
+  }
+  &:hover,
+  &:focus,
+  &.ps--clicking {
+    background-color: var(--mui-palette-action-hover) !important;
+  }
+  &:hover,
+  &:focus,
+  &.ps--clicking {
+    .ps__thumb-y {
+      background-color: var(--mui-palette-action-disabled) !important;
+    }
+  }
+}
+
+.ts-vertical-nav-root {
+  .ps__thumb-y {
+    inline-size: 4px;
+    &:hover,
+    &:focus,
+    &.ps--clicking {
+      inline-size: 6px;
+    }
+  }
+  .ps__rail-y {
+    inline-size: 10px;
+    &:hover,
+    &:focus,
+    &.ps--clicking {
+      background-color: transparent !important;
+      .ps__thumb-y {
+        inline-size: 6px;
+      }
+    }
+  }
+}
+
+:where([class^='tabler-']) {
+  font-size: 1.5rem;
+}
+
+/* Fix width issue for the input-otp component */
+input[autocomplete='one-time-code'][data-input-otp='true'] {
+  inline-size: 100% !important;
+}
+
+code {
+  font-family: inherit;
+  padding-block: 2px;
+  padding-inline: 4px;
+  border-radius: 4px;
+  font-size: 90%;
+  color: var(--mui-palette-info-main);
+  background-color: rgb(var(--mui-palette-info-mainChannel) / 0.08);
+  border: 0;
+}
+
+.bg-core {
+  background-image: url('/images/patterns/pattern.webp');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* ant design overrides */
+
+.ant-drawer-body{
+  padding: 0px !important;
+
+}
+/*
+* {
+  cursor: none !important;
+}
+
+button, a, input, textarea, select {
+  cursor: none !important;
+}
+
+.custom-cursor {
+  position: fixed;
+  inline-size: 16px;
+  block-size: 16px;
+  background-size: contain;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+
+.custom-cursor.pointer {
+  background: url('/cursors/pointer.svg') no-repeat center;
+}
+
+.custom-cursor.text {
+  background: url('/cursors/text.svg') no-repeat center;
+}
+} */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+  .theme {
+    --animate-shine: shine var(--duration) infinite linear;
+    --animate-marquee: marquee var(--duration) infinite linear;
+    --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+    --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+    --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@theme inline {
+  @keyframes shine {
+  0% {
+    background-position: 0% 0%;
+    }
+  50% {
+    background-position: 100% 100%;
+    }
+  to {
+    background-position: 0% 0%;
+    }
+  }
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes marquee-vertical {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-100%);
+  }
+}
+.animate-marquee {
+  animation: marquee var(--duration) linear infinite;
+}
+
+.animate-marquee-vertical {
+  animation: marquee-vertical var(--duration) linear infinite;
+}
+  @keyframes shimmer-slide {
+  to {
+    transform: translate(calc(100cqw - 100%), 0);
+    }
+  }
+  @keyframes spin-around {
+  0% {
+    transform: translateZ(0) rotate(0);
+    }
+  15%, 35% {
+    transform: translateZ(0) rotate(90deg);
+    }
+  65%, 85% {
+    transform: translateZ(0) rotate(270deg);
+    }
+  100% {
+    transform: translateZ(0) rotate(360deg);
+    }
+  }
+}
