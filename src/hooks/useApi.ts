@@ -12,20 +12,35 @@ type PendingRequest = {
   resolve: (value: any) => void;
 };
 
-const useApi = (guest = false) => {
+type UseApiOptions = {
+  guest?: boolean;
+  token?: string | null;
+};
+
+const useApi = (options: boolean | UseApiOptions = false) => {
+  const guest = typeof options === 'boolean' ? options : options.guest ?? false;
+  const customToken = typeof options === 'object' ? options.token : undefined;
+
   const { data: session, status } = useSession();
-  const token = session?.user?.accessToken;
+  const sessionToken = session?.user?.accessToken;
+  // Use custom token if provided, otherwise fallback to session token
+  const token = customToken !== undefined ? customToken : sessionToken;
+  
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
 
   useEffect(() => {
-    if (!guest && status === 'authenticated' && pendingRequests.length > 0) {
+    // If using custom token, we don't need to wait for session authentication status
+    // unless strictly not guest and no custom token is provided.
+    const isReady = customToken ? true : status === 'authenticated';
+    
+    if (!guest && isReady && pendingRequests.length > 0) {
       console.log(`🔄 Retrying ${pendingRequests.length} delayed API requests...`);
       pendingRequests.forEach(({ endpoint, method, body, resolve }) => {
         fetchFromBackend(endpoint, method, body).then(resolve);
       });
       setPendingRequests([]);
     }
-  }, [status, pendingRequests, guest]);
+  }, [status, pendingRequests, guest, customToken]);
 
   const fetchFromBackend = async (
     endpoint: string,
@@ -33,7 +48,8 @@ const useApi = (guest = false) => {
     body?: any
   ): Promise<any> => {
     try {
-      if (!guest && status === 'loading') {
+      // If no custom token and session is loading, wait.
+      if (!guest && !customToken && status === 'loading') {
         console.warn(`⚠️ Session loading. Delaying API request: ${endpoint}`);
         return new Promise((resolve) => {
           setPendingRequests((prev) => [...prev, { endpoint, method, body, resolve }]);

@@ -56,12 +56,16 @@ export async function GET(
 
   // ✅ Default Laravel proxy
   try {
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
     const result = await fetchFromLaravel(
       laravelEndpoint,
       'GET',
       undefined,
       undefined,
-      guest
+      guest,
+      token ?? undefined
     );
 
     if (result.status === 401) {
@@ -92,12 +96,16 @@ export async function POST(
   }
 
   try {
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
     const result = await fetchFromLaravel(
       laravelEndpoint,
       'POST',
       undefined,
       body,
-      guest
+      guest,
+      token ?? undefined
     );
 
     if (result.status === 401) {

@@ -10,12 +10,13 @@ export const fetchFromLaravel = async (
   method: HttpMethod,
   params?: Record<string, string | number>,
   body?: any,
-  guest: boolean = false
+  guest: boolean = false,
+  accessToken?: string | null
 ) => {
   try {
-    let token: string | null = null;
+    let token: string | null = accessToken ?? null;
 
-    if (!guest) {
+    if (!guest && !token) {
       const session = await getServerSession(authOptions);
       token = session?.user?.accessToken || null;
       if (!token) {

@@ -10,7 +10,7 @@ const config: Config = {
     preflight: false, // Disable preflight for MUI
   },
 
-  important: '#__next', // Make Tailwind important in Next root
+
 
   darkMode: ['class'], // Use dark mode via `.dark` class
 

@@ -36,6 +36,7 @@ interface Question {
   | "true_false"
   | "fill_in_the_blanks"
   | "subjective";
+  correctAnswer?: string | string[] | boolean | null; // Added for client-side validation
 }
 
 interface Answer {
@@ -118,7 +119,7 @@ export default function QuizPanel({
   >({});
 
   const uniqueModules = [...new Set(questionModuleMap)];
-  const { fetchFromBackend } = useApi();
+  const { fetchFromBackend } = useApi({ token: tokenFromQS || undefined });
 
   const handleGoToQuestion = (idx: number) => {
     const current = quizSession.answers[quizSession.currentIndex];
@@ -151,18 +152,42 @@ export default function QuizPanel({
     quizSession.answers[quizSession.currentIndex]?.correctAnswer ??
     null;
 
-  // Call API and set correctness for only the current question
+  // Call API or use local data to set correctness
   async function checkCurrentQuestionAnswer() {
     const qIdx = quizSession.currentIndex;
     const question = quizSession.questions[qIdx];
     const selected = quizSession.answers[qIdx]?.answer ?? null;
 
-    // Must have selected answer.
-    // Must have EITHER subtopicIdFromQS OR tokenFromQS.
     if (selected === null) {
         console.warn("Missing selected answer");
         return null;
     }
+
+    // Client-side validation if correctAnswer is present
+    if (question.correctAnswer !== undefined && question.correctAnswer !== null) {
+        let correct = false;
+        if (Array.isArray(question.correctAnswer) && Array.isArray(selected)) {
+            // Simple array comparison (order insensitive check might be needed but assuming sorted or strict for now)
+            // Ideally sort both
+            const s1 = [...question.correctAnswer].sort();
+            const s2 = [...selected].sort();
+            correct = JSON.stringify(s1) === JSON.stringify(s2);
+        } else {
+            correct = String(selected) === String(question.correctAnswer);
+        }
+
+        setStatusByIndex((prev) => ({
+            ...prev,
+            [qIdx]: { isCorrect: correct, correctAnswer: question.correctAnswer },
+        }));
+        
+        // Also update the answer object so result modal knows
+        updateAnswer({ correctAnswer: question.correctAnswer });
+        
+        return correct;
+    }
+
+    // Fallback to server-side check if no local correct answer
     if (!subtopicIdFromQS && !tokenFromQS) {
       console.warn("Missing subtopic_id and token");
       return null;

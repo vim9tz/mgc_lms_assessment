@@ -32,11 +32,11 @@ export default function Home() {
   const router = useRouter()
   const { data: session, status } = useSession()
   const searchParams = useSearchParams()
-  const subTopicId = searchParams.get('subTopic')
+  const subTopicId = searchParams.get('subTopic') || searchParams.get('subtopic_id')
   const practiceId = searchParams.get('practiceId')
   const mockId = searchParams.get('mockId')
   const test_id = searchParams.get('token')
-  const { fetchFromBackend } = useApi()
+  const { fetchFromBackend } = useApi({ token: test_id || undefined })
   const [getAttempt, setGetAttempt] = useState<GetAttemptResult | null>(null)
   const [quizItems, setQuizItems] = useState<AttemptWeightageItem[]>([])
   const [codingItems, setCodingItems] = useState<AttemptWeightageItem[]>([])
@@ -223,8 +223,8 @@ export default function Home() {
     // const effectiveType = sessionType || (token ? 'geeks_test' : 'test'); // already at top
 
     // For geeks_test, userId might not be required if we have a token/submission_id
-    if ((!userId && effectiveType !== 'geeks_test') || !testId) {
-      toast.error('Missing user or test info')
+    if (!testId) {
+      toast.error('Missing test info')
       return
     }
 
@@ -252,7 +252,7 @@ export default function Home() {
     console.log('handleConfirmSubmit Payload:', payload);
 
     try {
-      const res = await fetchFromBackend('/submitquiz', 'POST', payload)
+      const res = await fetchFromBackend('/questions/assessment/submitquiz', 'POST', payload)
       console.log('🚀 submitquiz response:', res);
 
       if (res.success) {
@@ -307,7 +307,8 @@ export default function Home() {
   }, [])
 
   const getAssessment = async () => {
-    const data = await fetchFromBackend('/test', 'POST', { subtopic_id: subTopicId })
+    const data = await fetchFromBackend('/questions/assessment/test', 'POST', { subtopic_id: subTopicId })
+    console.log('DEBUG: Test Check Data:', data);
     if (data?.error) {
       toast.error('Error while taking test.')
       return
@@ -316,8 +317,10 @@ export default function Home() {
       setGetAttempt(null)
     } else {
       setGetAttempt(data)
-      const quiz = data.weightage.filter((item: any) => item.type === 'quiz')
-      const code = data.weightage.filter((item: any) => item.type === 'coding')
+      const w = data.weightage || [] 
+      console.log('DEBUG: Encoded Weightage:', w)
+      const quiz = w.filter((item: any) => item.type === 'mcq') // changed from 'quiz'
+      const code = w.filter((item: any) => item.type === 'coding')
       setQuizItems(quiz)
       setCodingItems(code)
     }
@@ -419,8 +422,8 @@ export default function Home() {
     const type = typeof window !== 'undefined' ? sessionStorage.getItem('type') : null
     const testId = subTopicId
 
-    if (!userId || !testId) {
-      toast.error('Missing user or test info')
+    if (!testId) {
+      toast.error('Missing test info')
       return
     }
 
@@ -487,7 +490,7 @@ export default function Home() {
       // console.log('🚀 Final Submission Payload:', payload)
 
       try {
-        const res = await fetchFromBackend('/submitquiz', 'POST', payload)
+        const res = await fetchFromBackend('/questions/assessment/submitquiz', 'POST', payload)
 
         if (res?.success) {
           toast.success('Quiz submitted successfully!')
@@ -510,9 +513,9 @@ export default function Home() {
   }
 
   const getQuestion = async () => {
-    console.log('Calling /question endpoint with:', { subtopic_id: subTopicId })
-    const data = await fetchFromBackend('/question', 'POST', { subtopic_id: subTopicId })
-    console.log('Response from /question endpoint:', data)
+    console.log('Calling /questions/assessment/question endpoint with:', { subtopic_id: subTopicId })
+    const data = await fetchFromBackend('/questions/assessment/question', 'POST', { subtopic_id: subTopicId, type: effectiveType })
+    console.log('Response from /questions/assessment/question endpoint:', data)
     if (data?.error) {
       toast.error('Error while fetching questions.')
       return

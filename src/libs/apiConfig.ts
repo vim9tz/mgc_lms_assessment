@@ -14,10 +14,11 @@ export const apiEndpoints: Record<string, ApiEndpoint> = {
     GET: { url: '/me' },
   },
   testAttempt: {
-    POST: { url: '/learning/getAttempt' },
+    POST: { url: '/questions/guest/attempt' },
   },
   questions: {
-    POST: { url: '/learning/getQuestion' },
+    POST: { url: '/questions/guest/questions' },
+    GET: { url: '/questions' },
   },
   answers : {
     POST: { url: '/checkAnswers' },
@@ -32,10 +33,10 @@ export const apiEndpoints: Record<string, ApiEndpoint> = {
     POST: { url: '/verifyOtp' },
   },
   guestTest: {
-    POST: { url: '/testQuestions' },
+    POST: { url: '/questions/guest/questions' },
   },
   guestAttempt: {
-    POST: { url: '/testModules' },
+    POST: { url: '/questions/guest/attempt' },
   },
   endAttempt: {
     POST : {url : '/quiz/end'}
@@ -55,7 +56,7 @@ export const apiEndpoints: Record<string, ApiEndpoint> = {
     GET: { url: '/servertime' },
   },
   checkCheck: {
-    POST: { url: '/testCheckValidity' },
+    POST: { url: '/questions/guest/check-validity' },
   },
   practiceAttempt: {
     POST: { url: '/get-practice-attempt' },
@@ -69,6 +70,5 @@ export const apiEndpoints: Record<string, ApiEndpoint> = {
   mockQuestions: {
     POST: { url: '/get-mock-questions' },
   },
-  // Add more endpoints as needed
 };
 
