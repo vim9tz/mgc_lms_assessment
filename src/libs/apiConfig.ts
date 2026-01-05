@@ -70,5 +70,8 @@ export const apiEndpoints: Record<string, ApiEndpoint> = {
   mockQuestions: {
     POST: { url: '/get-mock-questions' },
   },
+  assessmentQuestions: {
+     GET: { url: '/v1/assessment/subtopics/{subtopic_id}/questions?type={type}' }
+  }
 };
 

@@ -36,6 +36,7 @@ export function resolveLaravelEndpoint(
     mockAttempt: 'mockAttempt',
     mockQuestions: 'mockQuestions',
     questions: 'questions',
+    assessmentQuestions: 'assessmentQuestions',
   };
 
   return staticMap[first] ?? null;

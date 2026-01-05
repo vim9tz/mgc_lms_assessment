@@ -9,7 +9,7 @@ const { TabPane } = Tabs; // Correctly destructure TabPane from Tabs component
 const { Option } = Select; // For the select dropdown
 const { Sider, Content } = Layout; // Ant Design Layout for Sidebar and Content
 
-export default function ProgrammingPage({ groupedQuestions, userId }: any) {
+export default function ProgrammingPage({ groupedQuestions, userId, isProctoringEnabled = true }: any) {
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(0); // To manage selected question
   const [htmlCode, setHtmlCode] = useState(""); // Separate code for each problem
   const [cssCode, setCssCode] = useState(""); // Separate code for each problem
@@ -35,6 +35,14 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
 
   const currentQuestion = groupedQuestions?.[selectedQuestionIndex] || {};
   const type = currentQuestion?.type?.toLowerCase() || "unknown";
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("");
+
+  useEffect(() => {
+     if (currentQuestion) {
+        const backendLang = currentQuestion.programming_language?.slug || currentQuestion.type || 'python';
+        setSelectedLanguage(backendLang.toLowerCase());
+     }
+  }, [selectedQuestionIndex, groupedQuestions]);
 
   const isWeb = ["html", "web", "web technologies"].includes(type);
 
@@ -60,13 +68,6 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
   `;
 
 
-  // const handlePythonRun = () => {
-  //   // Placeholder for backend call to run Python code
-  //   setPythonOutput(`Executed Python code: ${pythonCode}`);
-  //   setCustomOutput("Custom Output: This is a simulated custom log or result.");
-  // };
-
-
   const handleAddCustomTestCase = () => {
     if (customInput.trim() === '') return;
 
@@ -82,7 +83,6 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
 
 
   const handleWebRun = async () => {
-    console.log('hello')
     setActiveTab("3");   // ✅ open Test Cases tab
     setIsRunning(true);
 
@@ -111,10 +111,6 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
     });
     
 
-    console.log('testCases' , testCases)
-
-
-
     const payload = {
       language: "web",
       html: htmlCode,
@@ -123,8 +119,6 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
       test_cases: formattedTestCases,
       filename: 'web_' + Date.now(),
     };
-
-    // console.log("📦 Sending Payload to API: john", JSON.stringify(payload, null, 2));
 
     try {
       const res = await fetch("https://compilers.milliongeniuscoders.com/api/execute/", {
@@ -135,15 +129,8 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
         body: JSON.stringify(payload),
       });
 
-      // console.log("hello" , res)
-
       const data = await res.json();
-
-      // console.log("hello" , data)
-
-
       const storageKey = `testcases-${selectedQuestionIndex}`;
-
 
       if (res.ok) {
         // Inject weightage into each returned test case from currentQuestion
@@ -156,24 +143,11 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
             expected_output: original?.expected_output ?? '',
             weightage: original?.weightage ?? 0,  // ✅ This will now appear
           };
-
-          console.log(` Test Case ${index + 1}:`, {
-            original,
-            result,
-            merged,
-          });
-
           return merged; // ✅ this is key
         });
 
-
         console.log('✅ Final Merged Array:', enrichedTestCases, currentQuestion?.test_cases, data);
         sessionStorage.setItem(storageKey, JSON.stringify(enrichedTestCases));
-
-
-
-
-
         sessionStorage.setItem('testcases', JSON.stringify(enrichedTestCases));
         setCustomOutput(JSON.stringify(enrichedTestCases, null, 2));
       } else {
@@ -193,36 +167,8 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
 
   const handleEditorDidMount = (editor: any, monaco: any) => {
     monacoRef.current = editor;
-
-    // ❌ Disable copy, cut, and paste via keyboard shortcuts
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {
-      // Do nothing on Ctrl+C
-    });
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {
-      // Do nothing on Ctrl+X
-    });
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {
-      // Do nothing on Ctrl+V
-    });
-
-    // ❌ Disable right-click context menu
-    editor.updateOptions({ contextmenu: false });
-
-    // ❌ Block clipboard events
-    const domNode = editor.getDomNode();
-    if (domNode) {
-      const block = (e: ClipboardEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        alert("🚫 Clipboard actions are disabled.");
-      };
-      domNode.addEventListener("copy", block, true);
-      domNode.addEventListener("cut", block, true);
-      domNode.addEventListener("paste", block, true);
-    }
+    // Clipboard blocking removed as per user request
   };
-
-
 
   const handleCodeRun = async () => {
     setActiveTab("3");
@@ -230,6 +176,7 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
 
     const question = groupedQuestions[selectedQuestionIndex];
     // Dynamically map language name to compiler API code
+    // Assuming: 1=Python, 2=Java, 3=C, 4=C++, 10=NodeJS/JS (Standard Judge0-like mapping often used)
     const languageMap: Record<string, string> = {
       python: '1',
       java: '2',
@@ -237,14 +184,14 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
       'c language': '3',
       'cpp': '4',
       'c++': '4',
+      javascript: '10', // Or 'node' depending on API. Trying '10' based on commonality or 'node' if string supported. 
+      js: '10',
+      node: '10'
     };
 
     // Normalize incoming type/language
-    const langKey = (type || '').toLowerCase(); // 'c', 'python', etc.
-    const altLangKey = (question?.language || '').toLowerCase();
-    const languageCode = languageMap[langKey] || languageMap[altLangKey] || '1'; // default? or '0'
-
-    console.log('Running code for:', langKey, 'Code:', languageCode);
+    const langKey = (selectedLanguage || type || '').toLowerCase(); // Use selected language first
+    const languageCode = languageMap[langKey] || '1'; // Default to Python if unknown
 
     if (!code || languageCode === '0') {
       setCodeOutput(`❌ Language '${type}' not supported or code empty.`);
@@ -279,7 +226,21 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
         const output = data?.[0]?.output || 'No output';
         setCodeOutput(output);
         setCustomOutput(JSON.stringify(data, null, 2));
-        console.log(customOutput, 'adata')
+
+        // Persist for Submission (similar to Web Handler)
+        const storageKey = `testcases-${selectedQuestionIndex}`;
+        const enrichedTestCases = (data || []).map((result: any, index: number) => {
+          const original = currentQuestion?.test_cases?.[index];
+          return {
+            ...result,
+            input: original?.input ?? result?.input ?? '',
+            expected_output: original?.expected_output ?? '',
+            weightage: original?.weightage ?? 0,
+          };
+        });
+        sessionStorage.setItem(storageKey, JSON.stringify(enrichedTestCases));
+        
+        console.log('✅ Final Merged Array (Code):', enrichedTestCases);
 
       } else {
         setCodeOutput(`❌ Error: ${data?.message || 'Execution failed'}`);
@@ -463,12 +424,24 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
                   {!isWeb && (
 
                     <div>
-                      <div className="w-full flex justify-between items-center border-b  px-3 bg-white sticky top-0 z-10">
-                        <div className="flex items-center gap-1  px-2 pr-3 py-3 border-r">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
-                          </svg>
-                          <p className="font-medium text-sm">{getLanguageLabel(type)}</p>
+                      <div className="w-full flex justify-between items-center border-b px-3 bg-white sticky top-0 z-10">
+                        <div className="flex items-center gap-3 px-2 pr-3 py-2 border-r">
+                           {/* Language Dropdown */}
+                           <Select
+                              value={selectedLanguage || type}
+                              style={{ width: 120 }}
+                              onChange={(val) => {
+                                setSelectedLanguage(val);
+                                // Optional: Reset code or template if needed
+                              }}
+                              options={[
+                                { value: 'python', label: 'Python' },
+                                { value: 'java', label: 'Java' },
+                                { value: 'c', label: 'C' },
+                                { value: 'cpp', label: 'C++' },
+                                { value: 'javascript', label: 'JavaScript' },
+                              ]}
+                           />
                         </div>
                         <div className="flex gap-3 items-center ">
                           {/* Run Button */}
@@ -507,7 +480,6 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
                         theme={theme}
                         options={{
                           fontSize,
-                          contextmenu: false // Just in case
                         }}
                         onChange={(val) => {
                           setCode(val || "");
@@ -627,19 +599,19 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-1">
                                                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Input</p>
-                                                    <div className="bg-white border border-slate-200 rounded-md p-2 font-mono text-xs text-slate-700 overflow-x-auto">
+                                                    <div className="bg-white border border-slate-200 rounded-md p-2 font-mono text-xs text-slate-700 overflow-x-auto whitespace-pre-wrap">
                                                         {test.input || <span className="text-slate-400 italic">Empty</span>}
                                                     </div>
                                                 </div>
                                                 <div className="space-y-1">
                                                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Expected Output</p>
-                                                    <div className="bg-white border border-slate-200 rounded-md p-2 font-mono text-xs text-slate-700 overflow-x-auto">
+                                                    <div className="bg-white border border-slate-200 rounded-md p-2 font-mono text-xs text-slate-700 overflow-x-auto whitespace-pre-wrap">
                                                         {test.expected_output || <span className="text-slate-400 italic">Empty</span>}
                                                     </div>
                                                 </div>
                                                 <div className="col-span-2 space-y-1">
                                                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Actual Output</p>
-                                                     <div className={`border rounded-md p-2 font-mono text-xs overflow-x-auto ${isRun ? (passed ? 'bg-green-50 border-green-100 text-green-900' : 'bg-red-50 border-red-100 text-red-900') : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                                                     <div className={`border rounded-md p-2 font-mono text-xs overflow-x-auto whitespace-pre-wrap ${isRun ? (passed ? 'bg-green-50 border-green-100 text-green-900' : 'bg-red-50 border-red-100 text-red-900') : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
                                                         {output ?? <span className="text-slate-400 italic">Ready to run...</span>}
                                                      </div>
                                                 </div>
@@ -749,17 +721,17 @@ export default function ProgrammingPage({ groupedQuestions, userId }: any) {
                                             <div className="grid grid-cols-2 gap-4 text-sm">
                                               <div className="col-span-1">
                                                 <p className="text-slate-500 text-xs uppercase mb-1">Input</p>
-                                                <div className="font-mono text-slate-700 bg-white px-3 py-1.5 rounded-md border border-slate-200 overflow-x-auto">{test.input || '—'}</div>
+                                                <div className="font-mono text-slate-700 bg-white px-3 py-1.5 rounded-md border border-slate-200 overflow-x-auto whitespace-pre-wrap">{test.input || '—'}</div>
                                               </div>
                                               <div className="col-span-1">
                                                 <p className="text-slate-500 text-xs uppercase mb-1">Expected</p>
-                                                <div className="font-mono text-slate-700 bg-white px-3 py-1.5 rounded-md border border-slate-200 overflow-x-auto">
+                                                <div className="font-mono text-slate-700 bg-white px-3 py-1.5 rounded-md border border-slate-200 overflow-x-auto whitespace-pre-wrap">
                                                   {test.expected_output ?? 'null'}
                                                 </div>
                                               </div>
                                                <div className="col-span-2">
                                                 <p className="text-slate-500 text-xs uppercase mb-1">Actual Output</p>
-                                                <div className={`font-mono px-3 py-1.5 rounded-md border overflow-x-auto ${isRun ? (passed ? 'bg-green-50 border-green-100 text-green-900' : 'bg-red-50 border-red-100 text-red-900') : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
+                                                <div className={`font-mono px-3 py-1.5 rounded-md border overflow-x-auto whitespace-pre-wrap ${isRun ? (passed ? 'bg-green-50 border-green-100 text-green-900' : 'bg-red-50 border-red-100 text-red-900') : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
                                                   {output ?? 'Ready to run...'}
                                                 </div>
                                               </div>

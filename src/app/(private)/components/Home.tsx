@@ -59,6 +59,11 @@ export default function Home() {
   const [seconds, setSeconds] = useState<number>(0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const socketRef = useRef<Socket | null>(null)
+  
+  // Localhost / Proctoring Toggle State
+  const [isProctoringEnabled, setIsProctoringEnabled] = useState(true);
+  const [isLocalhost, setIsLocalhost] = useState(false);
+
   const [proctoringState, setProctoringState] = useState({
         tabSwitches: 0,
         fullscreenViolations: 0,
@@ -71,11 +76,19 @@ export default function Home() {
 
      // Calculate effectiveType early for hooks
      const token = searchParams.get('token');
-     const effectiveType = type || (token ? 'geeks_test' : 'test');
+     const urlType = searchParams.get('type');
+     const sessionType = typeof window !== 'undefined' ? sessionStorage.getItem('type') : null;
+     
+     // Robust Type Resolution: URL > Session > Token inference > Default
+     const effectiveType = urlType || sessionType || (token ? 'geeks_test' : 'test');
 
 
     // Capture system info on mount
     useEffect(() => {
+        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+            setIsLocalhost(true);
+        }
+
         const info = {
             userAgent: navigator.userAgent,
             platform: navigator.platform,
@@ -89,6 +102,7 @@ export default function Home() {
     const [isInFullscreen, setIsInFullscreen] = useState(false);
 
     useEffect(() => {
+        if (!isProctoringEnabled) return; // 🔴 Exit if disabled
         if (!['assessment', 'geeks_test'].includes(effectiveType)) return;
 
         const logEvent = (type: string, details: any = {}) => {
@@ -163,7 +177,7 @@ export default function Home() {
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
             document.body.removeEventListener('mouseleave', handleMouseLeave);
         };
-    }, [effectiveType]);
+    }, [effectiveType, isProctoringEnabled]);
 
   const handleOpenResults = () => {
 
@@ -251,26 +265,48 @@ export default function Home() {
     
     console.log('handleConfirmSubmit Payload:', payload);
 
-    try {
-      const res = await fetchFromBackend('/questions/assessment/submitquiz', 'POST', payload)
-      console.log('🚀 submitquiz response:', res);
+    // 5. Direct Backend Submission
+    // Replaced fetchFromBackend with direct fetch to match handleSubmitTest
+    const directUrl = 'http://localhost:8001/api/v1/assessment/submit';
+    const authToken = searchParams.get('token');
 
-      if (res.success) {
+    // Add allocation_mode explicitly if needed, though 'type' should cover it
+    payload.allocation_mode = effectiveType;
+
+    try {
+      const res = await fetch(directUrl, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken || session?.user?.accessToken || ''}`
+          },
+          body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      console.log('🚀 Submit response (Confirm):', data);
+
+      if (res.ok && data.success) {
         toast.success('Submitted successfully!')
-        const courseId = res.course_id;
+        const courseId = data.data?.course_id || data.course_id; // Check both structures
 
         if (effectiveType === 'assessment' || effectiveType === 'geeks_test' || !courseId) {
-          window.location.href = '/dashboard';
+           if (typeof window !== 'undefined' && !session?.user?.id) {
+               toast.info("Result saved. You can close this window.");
+           } else {
+               window.location.href = '/dashboard';
+           }
         } else {
+          const baseUrl = process.env.NODE_ENV === 'production' ? 'https://app.skillryt.com' : 'http://localhost:3000';
           window.location.href = `${baseUrl}/my-courses/${courseId}/course-details`;
         }
-
-        // window.close()
       } else {
-        toast.error('Submission failed.')
+        toast.error(`Submission failed: ${data.message || 'Unknown error'}`)
+        console.error('Submission failed:', data);
       }
     } catch (err) {
-      console.error(err)
+      console.error('Submit error:', err)
       toast.error('Server error submitting.')
     }
   }
@@ -419,7 +455,9 @@ export default function Home() {
       })
     }
 
-    const type = typeof window !== 'undefined' ? sessionStorage.getItem('type') : null
+    // Use the robust effectiveType calculated at component level
+    const finalType = effectiveType || 'knowledge_check';
+
     const testId = subTopicId
 
     if (!testId) {
@@ -451,57 +489,73 @@ export default function Home() {
       }
     }
 
-    if (type === 'test') {
-      try {
-        // const res = await fetchFromBackend("/endtest", "POST", {
-        //   user_id: userId,
-        //   test_id: testId,
-        // });
-
-        const socket = getSocket()
-
-        socket.emit('submit_test', {
-          userId: userId,
-          testId: sessionStorage.getItem('testId'),
-          type: sessionStorage.getItem('type')
-        })
-
-        // if (res?.success) {
-        //   toast.success("Test submitted successfully!");
-        //   // window.location.href = '/thank-you';
-        // } else {
-        //   toast.error("Failed to submit test.");
-        // }
-      } catch (err) {
-        console.error('Test submit error:', err)
-        toast.error('Server error submitting test.')
-      }
-    } else {
-      const allQuizSubmissions = quizSessionHook.quizSession?.answers || []
-      const testCases = JSON.parse(sessionStorage.getItem('testcases') || '[]')
-
-      const payload = {
+    // 4. Construct Payload
+    const allQuizSubmissions = quizSessionHook.quizSession?.answers || []
+    
+    // For 'test' mode, we usually don't have quiz submissions in the same way, but if we do, include them.
+    // If it's pure coding (practice), this array might be empty. 
+    
+    const payload = {
         user_id: userId,
         test_id: testId,
+        type: effectiveType, // Robust type from URL/Session
         allQuizSubmissions,
-        allCodeSubmissions
-      }
+        allCodeSubmissions: code_submissions,
+        allocation_mode: effectiveType, // Send as allocation_mode as distinct field if backend prefers, mostly 'type' covers it
+        tab_switches: proctoringState.tabSwitches,
+        copy_paste: proctoringState.copyPasteAttempts,
+        fullscreen_violations: proctoringState.fullscreenViolations,
+        mouse_leaves: proctoringState.mouseLeaves,
+        proctoring_logs: proctoringState.logs,
+        system_info: proctoringState.systemInfo,
+    };
 
-      // console.log('🚀 Final Submission Payload:', payload)
+    console.log('🚀 Final Submission Payload:', payload);
 
-      try {
-        const res = await fetchFromBackend('/questions/assessment/submitquiz', 'POST', payload)
+    // 5. Direct Backend Submission
+    const directUrl = 'http://localhost:8001/api/v1/assessment/submit';
+    const authToken = searchParams.get('token'); 
 
-        if (res?.success) {
-          toast.success('Quiz submitted successfully!')
-          // window.location.href = '/thank-you';
+    try {
+        const res = await fetch(directUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                // Prefer token from URL for guest/public assessments, fallback to session, or empty
+                'Authorization': `Bearer ${authToken || session?.user?.accessToken || ''}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        console.log('🚀 Submit response:', data);
+
+        if (res.ok && data.success) {
+            toast.success("Assessment submitted successfully!");
+            
+            // Redirect logic
+            if (effectiveType === 'assessment' || effectiveType === 'geeks_test' || !data.data?.course_id) {
+               // For public/guest tests, maybe show a thank you or result modal instead of redirecting to dashboard immediately
+               // Keeping existing logic:
+               if (typeof window !== 'undefined' && !session?.user?.id) {
+                   // Guest user
+                   toast.info("Result saved. You can close this window.");
+               } else {
+                   window.location.href = '/dashboard';
+               }
+            } else {
+               const baseUrl = process.env.NODE_ENV === 'production' ? 'https://app.skillryt.com' : 'http://localhost:3000';
+               window.location.href = `${baseUrl}/my-courses/${data.data.course_id}/course-details`;
+            }
         } else {
-          toast.error('Failed to submit quiz.')
+            console.error('Submission failed:', data);
+            toast.error(`Failed to submit: ${data.message || 'Unknown error'}`);
         }
-      } catch (err) {
-        console.error('Quiz submit error:', err)
-        toast.error('Server error submitting quiz.')
-      }
+
+    } catch (err) {
+        console.error('Submit error:', err);
+        toast.error('Server error submitting assessment.');
     }
   }
 
@@ -522,6 +576,125 @@ export default function Home() {
     }
     setQuestionsData(data)
   }
+const getAssessmentQuestions = async () => {
+    try {
+        const typeParam = searchParams.get('type');
+        const reqType = typeParam || 'knowledge_check';
+
+        const token = searchParams.get('token'); // ✅ extract token from URL
+
+        if (!token) {
+            toast.error('Authentication token missing');
+            return;
+        }
+
+        const directUrl = `http://localhost:8001/api/v1/assessment/subtopics/${subTopicId}/questions?type=${reqType}`;
+
+        console.log(`Calling direct backend: ${directUrl}`);
+
+        const response = await fetch(directUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}` // ✅ attach Bearer token
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Response from Assessment API:', data);
+
+        const questions = data.data || [];
+
+        const mcqQuestions = questions
+            .filter((q: any) => q.type === 'mcq')
+            .map((q: any) => {
+                const optionsRecord: Record<string, string> = {};
+                const correctAnswers: string[] = [];
+
+                if (Array.isArray(q.mcq_options)) {
+                    q.mcq_options.forEach((opt: any) => {
+                        const optId = String(opt.id);
+                        optionsRecord[optId] = opt.text || opt.option || ''; 
+                        if (opt.is_correct) {
+                            correctAnswers.push(optId);
+                        }
+                    });
+                }
+
+                // Determine frontend type based on mcq_type relation or inference
+                // Backend 'mcq_type' might have 'slug' or 'code'. 
+                // Common slugs: 'single_choice', 'multiple_choice'
+                const backendType = q.mcq_type?.slug || q.mcq_type?.code || '';
+                let frontendType = 'single_choice';
+
+                if (backendType === 'multiple_choice' || correctAnswers.length > 1) {
+                    frontendType = 'multiple_choice';
+                }
+
+                return {
+                    ...q,
+                    quiz_id: String(q.id), // Components expect string ID
+                    question: q.title || q.question || '', // Map title to 'question' prop
+                    options: optionsRecord,
+                    type: frontendType, // Overwrite 'mcq' with specific UI type
+                    correctAnswer: frontendType === 'multiple_choice' ? correctAnswers : (correctAnswers[0] || null),
+                    module_name: 'General'
+                };
+            });
+
+        const codingQuestions = questions
+            .filter((q: any) => q.type === 'coding')
+            .map((q: any) => {
+                const testCases = (q.coding_details || [])
+                    .flatMap((detail: any) => detail.coding_testcases || [])
+                    .map((tc: any) => ({
+                        input: tc.input_data || '',
+                        expected_output: tc.expected_output || '',
+                        weightage: tc.weightage || 0
+                    }));
+
+                return {
+                    ...q,
+                    question_id: q.id, // Coding components expect question_id
+                    title: q.title || `Question ${q.id}`,
+                    description: q.content || '', // Map content to description for ProblemStatement
+                    test_cases: testCases,
+                    module_name: 'General'
+                };
+            });
+
+        const formattedData = {
+            data: {
+                mcq: mcqQuestions.length
+                    ? [{ module_name: 'General', questions: mcqQuestions }]
+                    : [],
+                coding: codingQuestions.length
+                    ? [{ module_name: 'General', questions: codingQuestions }]
+                    : []
+            }
+        };
+
+        setQuestionsData(formattedData);
+
+        if (mcqQuestions.length) {
+            setQuizItems([{ type: 'mcq', count: mcqQuestions.length, mod_name: 'General' }] as any);
+        }
+
+        if (codingQuestions.length) {
+            setCodingItems([{ type: 'coding', count: codingQuestions.length, mod_name: 'General' }] as any);
+        }
+
+    } catch (error) {
+        console.error(error);
+        toast.error('Failed to load questions.');
+    }
+};
+
   const getPracticeQuestion = async () => {
     console.log('Calling /practiceQuestions endpoint with:', { practise_id: practiceId })
     const data = await fetchFromBackend('/practiceQuestions', 'POST', { practise_id: practiceId })
@@ -721,8 +894,15 @@ export default function Home() {
 
   useEffect(() => {
     if (subTopicId) {
-      getAssessment()
-      getQuestion()
+      const typeParam = searchParams.get('type');
+      if (typeParam === 'knowledge_check' || typeParam === 'practice') {
+          // Use the new API for these types
+          getAssessmentQuestions();
+      } else {
+          // Fallback to old behavior
+          getAssessment()
+          getQuestion()
+      }
       return
     }
     else if (practiceId) {
@@ -778,6 +958,18 @@ export default function Home() {
         )}
 
         <div className='flex gap-2 justify-end items-center'>
+          {/* Localhost Toggle Button (Moved here) */}
+          {isLocalhost && (
+             <Button 
+                variant="outlined" 
+                color={isProctoringEnabled ? "error" : "success"} 
+                size="small"
+                onClick={() => setIsProctoringEnabled(!isProctoringEnabled)}
+             >
+                 {isProctoringEnabled ? "Disable Proctoring" : "Enable Proctoring"}
+             </Button>
+          )}
+
           {(session?.user?.id && (subTopicId || token)) && (
             <TestTimer seconds={seconds} />
           )}
@@ -844,7 +1036,12 @@ export default function Home() {
 
           return isSpecialType
             ? <Coding groupedQuestions={enrichedQuestions} />
-            : <ProgrammingPage groupedQuestions={allCodingQuestions} userId={userId} />
+            : <ProgrammingPage 
+                key={isProctoringEnabled ? 'secure' : 'insecure'}
+                groupedQuestions={allCodingQuestions} 
+                userId={userId} 
+                isProctoringEnabled={isProctoringEnabled} 
+              />
         })()
       ) : (
         <div className="text-primary">Loading questions...</div>
@@ -863,7 +1060,7 @@ export default function Home() {
       />
 
        {/* Fullscreen Enforcement Overlay */}
-       {(['assessment', 'geeks_test'].includes(effectiveType)) && !isInFullscreen && (
+       {(['assessment', 'geeks_test'].includes(effectiveType)) && isProctoringEnabled && !isInFullscreen && (
         <div className="fixed inset-0 z-[9999] bg-white flex flex-col items-center justify-center text-center p-6">
             <h2 className="text-2xl font-bold mb-4 text-red-600">⚠️ Assessment Security</h2>
             <p className="mb-6 text-gray-700 max-w-md">
