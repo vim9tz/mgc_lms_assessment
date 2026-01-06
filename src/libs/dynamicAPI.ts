@@ -44,7 +44,8 @@ export const fetchFromLaravel = async (
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${process.env.LARAVEL_API_URL}${apiUrl}`, {
+    const baseUrl = process.env.LARAVEL_API_URL || 'http://localhost:8001/api';
+    const response = await fetch(`${baseUrl}${apiUrl}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,

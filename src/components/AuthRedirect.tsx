@@ -61,7 +61,7 @@ export default function AuthRedirect() {
 
     // 🔐 Case 5: Non-guest with token and no session → attempt login
     if (!isGuest && token && !session) {
-      signIn("credentials", { Temptoken: token, redirect: false }).then((result) => {
+      signIn("credentials", { Token: token, redirect: false }).then((result) => {
         if (result?.error) {
           console.error("❌ Auth failed:", result.error);
           setUnauthorized(true);

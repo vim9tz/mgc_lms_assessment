@@ -14,7 +14,8 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (credentials?.Token) {
           // 🔓 Direct token login (e.g., from OTP)
-          const res = await fetch(`${process.env.LARAVEL_API_URL}/me`, {
+          const apiUrl = process.env.LARAVEL_API_URL || 'http://localhost:8001/api';
+          const res = await fetch(`${apiUrl}/user`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',

@@ -37,6 +37,8 @@ export default function ProgrammingPage({ groupedQuestions, userId, isProctoring
   const type = currentQuestion?.type?.toLowerCase() || "unknown";
   const [selectedLanguage, setSelectedLanguage] = useState<string>("");
 
+  console.log('ProgrammingPage groupedQuestions:', groupedQuestions);
+
   useEffect(() => {
      if (currentQuestion) {
         const backendLang = currentQuestion.programming_language?.slug || currentQuestion.type || 'python';
@@ -271,10 +273,13 @@ export default function ProgrammingPage({ groupedQuestions, userId, isProctoring
     const savedJsCode = sessionStorage.getItem(`jsCode-${index}`);
     const savedCode = sessionStorage.getItem(`code-${index}`);
 
+    const question = groupedQuestions?.[index];
+
     setHtmlCode(savedHtmlCode || "");
     setCssCode(savedCssCode || "");
     setJsCode(savedJsCode || "");
-    setCode(savedCode || "");
+    // Use Session Storage -> Backend Persistence -> Empty
+    setCode(savedCode || question?.user_code || "");
   };
 
   const saveCodeToSessionStorage = (codeVal: string, langType: string) => {

@@ -9,7 +9,6 @@ import type { ChildrenType } from '@core/types'
 import AuthRedirect from '@/components/AuthRedirect'
 
 export default async function AuthGuard({ children }: ChildrenType) {
-  const session = await getServerSession(authOptions)
-
-  return <>{session ? children : <AuthRedirect />}</>
+  // Bypassing auth check for now as requested
+  return <>{children}</>
 }
