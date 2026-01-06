@@ -34,7 +34,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   onNext,
 }) => {
   return (
-    <div className="w-[400px] xl:w-[450px] bg-white border-r flex flex-col h-full shrink-0 transition-all duration-300">
+    <div className="w-full md:w-[400px] xl:w-[450px] bg-white border-r flex flex-col h-full shrink-0 transition-all duration-300">
       
       {/* HEADER */}
       <Box

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { CircularProgress, Box, IconButton, Tooltip } from "@mui/material";
-import { KeyboardDoubleArrowRight } from "@mui/icons-material";
+import { CircularProgress, Box, IconButton, Tooltip, Tabs, Tab, useMediaQuery, useTheme } from "@mui/material";
+import { KeyboardDoubleArrowRight, Description, Code as CodeIcon, Terminal } from "@mui/icons-material";
 import { CodeRunnerInterfaceProps, Question, SubmissionResult, TopicQuestion, TestCaseResult } from "./types";
 import TopicDrawer from "./components/TopicDrawer";
 import LeftPanel from "./components/LeftPanel";
@@ -11,6 +11,9 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   questionId: propQuestionId,
   token,
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   // State for current question ID
   const [currentQuestionId, setCurrentQuestionId] = useState<string>(propQuestionId);
 
@@ -24,6 +27,9 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   // NOTE: activeTab now refers to Bottom Panel tabs (0: Output, 1: Test Cases)
   const [activeTab, setActiveTab] = useState(0); 
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(false);
+
+  // Mobile Tab State: 0 = Problem, 1 = Code, 2 = Result
+  const [mobileTab, setMobileTab] = useState(0);
 
   const [code, setCode] = useState("// Loading...");
   const [languageId, setLanguageId] = useState<number>(1);
@@ -135,6 +141,11 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
       // Auto-open bottom panel
       setBottomPanelCollapsed(false);
       setActiveTab(0); // Show Output Tab initially
+      
+      // On mobile, switch to Result tab
+      if (isMobile) {
+          setMobileTab(2);
+      }
 
       try {
         const langMap: Record<string, string> = {
@@ -181,8 +192,6 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
             test_cases: mappedTestCases
         });
         
-        // If we have distinct test case results, prefer showing Test Cases tab?
-        // Let's stick to Output tab unless Submit which usually implies checking tests
         if (isSubmit || mappedTestCases.length > 0) {
             setActiveTab(1); // Switch to Test Cases tab if we have structured test results
         }
@@ -235,7 +244,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   if (!question) return <div className="p-10 text-center">Question not found</div>;
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className={`flex flex-col h-screen bg-gray-100 overflow-hidden relative ${isMobile ? 'pb-[70px]' : ''}`}>
       <TopicDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -245,56 +254,125 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         onSwitchQuestion={handleSwitchQuestion}
       />
 
-      {/* COLLAPSED LEFT STRIP */}
-      {!leftPanelOpen && (
-          <Box className="w-10 border-r bg-white flex flex-col items-center py-4 gap-4 shrink-0 transition-all">
-             <Tooltip title="Expand Problem" placement="right">
-                 <IconButton onClick={() => setLeftPanelOpen(true)} size="small">
-                     <KeyboardDoubleArrowRight fontSize="small" />
-                 </IconButton>
-             </Tooltip>
+      <div className="flex flex-1 overflow-hidden">
+        {/* DESKTOP LEFT PANEL (Hidden on Mobile unless tab is Problem) */}
+        {(!isMobile || mobileTab === 0) && (
+            <>
+                {/* COLLAPSED LEFT STRIP (Desktop only) */}
+                {!isMobile && !leftPanelOpen && (
+                    <Box className="w-10 border-r bg-white flex flex-col items-center py-4 gap-4 shrink-0 transition-all">
+                        <Tooltip title="Expand Problem" placement="right">
+                            <IconButton onClick={() => setLeftPanelOpen(true)} size="small">
+                                <KeyboardDoubleArrowRight fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                )}
+
+                {/* LEFT PANEL */}
+                {(isMobile || leftPanelOpen) && (
+                    <div className={`${isMobile ? 'w-full' : ''}`}>
+                        <LeftPanel
+                            question={question}
+                            drawerOpen={drawerOpen}
+                            onCollapse={() => setLeftPanelOpen(false)}
+                            onOpenDrawer={() => setDrawerOpen(true)}
+                            onPrev={prevQuestionId ? () => handleSwitchQuestion(prevQuestionId) : null}
+                            onNext={nextQuestionId ? () => handleSwitchQuestion(nextQuestionId) : null}
+                        />
+                    </div>
+                )}
+            </>
+        )}
+
+        {/* RIGHT COLUMN (DESKTOP: Editor + Output / MOBILE: Separated by Tabs) */}
+        {!isMobile ? (
+            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+                <div className="flex-1 overflow-hidden min-h-0 relative">
+                    <EditorPanel
+                        question={question}
+                        code={code}
+                        editorLanguage={editorLanguage}
+                        submitting={submitting}
+                        onChangeCode={setCode}
+                        onRun={() => runCodeLogic(false)}
+                        onSubmit={() => runCodeLogic(true)}
+                    />
+                </div>
+                <BottomPanel 
+                    question={question}
+                    result={result}
+                    activeTab={activeTab}
+                    onChangeTab={setActiveTab}
+                    collapsed={bottomPanelCollapsed}
+                    onToggleCollapse={() => setBottomPanelCollapsed(!bottomPanelCollapsed)}
+                />
+            </div>
+        ) : (
+            <div className="flex-1 flex flex-col w-full h-full overflow-hidden">
+                {mobileTab === 1 && (
+                    <EditorPanel
+                        question={question}
+                        code={code}
+                        editorLanguage={editorLanguage}
+                        submitting={submitting}
+                        onChangeCode={setCode}
+                        onRun={() => runCodeLogic(false)}
+                        onSubmit={() => runCodeLogic(true)}
+                    />
+                )}
+                
+                {mobileTab === 2 && (
+                    <div className="bg-white h-full overflow-auto">
+                        <BottomPanel 
+                            question={question}
+                            result={result}
+                            activeTab={activeTab}
+                            onChangeTab={setActiveTab}
+                            collapsed={false} // Always expanded in mobile view tab
+                            onToggleCollapse={() => {}} 
+                        />
+                    </div>
+                )}
+            </div>
+        )}
+      </div>
+
+      {/* MOBILE BOTTOM NAVIGATION */}
+      {isMobile && (
+          <Box className="bg-white/80 backdrop-blur-xl border-t border-white/20 z-50 shrink-0 rounded-t-[2.5rem] shadow-[0_-8px_30px_rgba(0,0,0,0.08)] pb-1 absolute bottom-0 w-full">
+               <Tabs
+                  value={mobileTab}
+                  onChange={(_, v) => setMobileTab(v)}
+                  variant="fullWidth"
+                  indicatorColor="primary"
+                  textColor="primary"
+                  sx={{
+                      '& .MuiTabs-indicator': { 
+                          height: 4, 
+                          borderRadius: '4px',
+                          maxWidth: 40,
+                          left: '0 !important',
+                          right: '0 !important',
+                          mx: 'auto',
+                          width: '100% !important',
+                          bottom: 8
+                      },
+                      '& .MuiTab-root': { 
+                          textTransform: 'none', 
+                          minHeight: 70, 
+                          fontSize: '0.75rem', 
+                          color: '#94a3b8',
+                          '&.Mui-selected': { color: '#0f172a' } 
+                      }
+                  }}
+               >
+                  <Tab icon={<Description sx={{ mb: 0.5, fontSize: 22 }} />} label="Problem" />
+                  <Tab icon={<CodeIcon sx={{ mb: 0.5, fontSize: 22 }} />} label="Code" />
+                  <Tab icon={<Terminal sx={{ mb: 0.5, fontSize: 22 }} />} label="Output" />
+               </Tabs>
           </Box>
       )}
-
-      {/* LEFT PANEL (Problem Content) */}
-      {leftPanelOpen && (
-        <LeftPanel
-            question={question}
-            drawerOpen={drawerOpen}
-            onCollapse={() => setLeftPanelOpen(false)}
-            onOpenDrawer={() => setDrawerOpen(true)}
-            onPrev={prevQuestionId ? () => handleSwitchQuestion(prevQuestionId) : null}
-            onNext={nextQuestionId ? () => handleSwitchQuestion(nextQuestionId) : null}
-        />
-      )}
-
-      {/* RIGHT COLUMN (Editor + Output) */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-          
-          {/* TOP: Editor */}
-          <div className="flex-1 overflow-hidden min-h-0 relative">
-            <EditorPanel
-                question={question}
-                code={code}
-                editorLanguage={editorLanguage}
-                submitting={submitting}
-                onChangeCode={setCode}
-                onRun={() => runCodeLogic(false)}
-                onSubmit={() => runCodeLogic(true)}
-            />
-          </div>
-
-          {/* BOTTOM: Output & Test Cases */}
-          <BottomPanel 
-              question={question}
-              result={result}
-              activeTab={activeTab}
-              onChangeTab={setActiveTab}
-              collapsed={bottomPanelCollapsed}
-              onToggleCollapse={() => setBottomPanelCollapsed(!bottomPanelCollapsed)}
-          />
-
-      </div>
     </div>
   );
 };

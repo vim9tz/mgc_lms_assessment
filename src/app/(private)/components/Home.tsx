@@ -675,7 +675,8 @@ const getAssessmentQuestions = async () => {
                     : [],
                 coding: codingQuestions.length
                     ? [{ module_name: 'General', questions: codingQuestions }]
-                    : []
+                    : [],
+                is_saved_state: false
             }
         };
 
