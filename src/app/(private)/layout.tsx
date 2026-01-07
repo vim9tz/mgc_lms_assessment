@@ -26,9 +26,9 @@ import AuthGuard from '@/hocs/AuthGuard'
 import BlankLayout from '@/@layouts/BlankLayout'
 
 export const metadata = {
-  title: 'SkillRYT Assessment',
+  title: 'Assessment -  KGISL EDU',
   description:
-    'SkillRYT Assessment - Take exam at ease',
+    'Assessment - Take exam at ease',
    icons: {
     icon: [
       { url: '/favicon_light.ico', media: '(prefers-color-scheme: light)' },

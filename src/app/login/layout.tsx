@@ -24,9 +24,9 @@ import AppReactToastify from '@/libs/styles/AppReactToastify'
 import { NextAuthProvider } from '@/contexts/nextAuthProvider'
 
 export const metadata = {
-  title: 'SkillRYT Assessment Login',
+  title: 'Assessment Login - KGISL EDU',
   description:
-    'SkillRYT Assessment - login to access your exam',
+    'Assessment Login - login to access your exam',
   icons: {
     icon: [
       { url: '/favicon_light.ico', media: '(prefers-color-scheme: light)' },
