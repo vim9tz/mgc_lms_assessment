@@ -551,29 +551,43 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
              </Tabs>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 pt-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 pt-4 custom-scrollbar" style={{ maxWidth: '100%' }}>
              {leftTab === 0 && (
                 <>
                     <div
-                      className="prose max-w-none text-slate-700 leading-relaxed text-sm"
+                      className="prose text-slate-700 leading-relaxed text-sm question-content"
                       style={{ 
                         wordBreak: 'break-word', 
-                        overflowWrap: 'break-word',
-                        whiteSpace: 'pre-wrap'
+                        overflowWrap: 'anywhere',
+                        hyphens: 'auto',
+                        maxWidth: '100%',
+                        width: '100%'
                       }}
                       dangerouslySetInnerHTML={{ __html: question.content }}
                     />
-                    <style jsx global>{`
-                      .prose pre, .prose code {
-                        white-space: pre-wrap !important;
+                    <style>{`
+                      .question-content,
+                      .question-content * {
+                        max-width: 100% !important;
                         word-break: break-word !important;
-                        overflow-wrap: break-word !important;
-                        max-width: 100% !important;
-                        overflow-x: hidden !important;
+                        overflow-wrap: anywhere !important;
                       }
-                      .prose img, .prose table {
+                      .question-content pre, 
+                      .question-content code {
+                        white-space: pre-wrap !important;
+                        word-break: break-all !important;
+                        overflow-wrap: anywhere !important;
+                      }
+                      .question-content img, 
+                      .question-content table {
                         max-width: 100% !important;
-                        overflow-x: auto !important;
+                      }
+                      .question-content p,
+                      .question-content li,
+                      .question-content span,
+                      .question-content div {
+                        word-break: break-word !important;
+                        overflow-wrap: anywhere !important;
                       }
                     `}</style>
 
