@@ -29,8 +29,8 @@ export const metadata = {
     'Assessment Login - login to access your exam',
   icons: {
     icon: [
-      { url: '/favicon_light.ico', media: '(prefers-color-scheme: light)' },
-      { url: '/favicon_dark.ico', media: '(prefers-color-scheme: dark)' }
+      { url: '/favicon.ico', media: '(prefers-color-scheme: light)' },
+      { url: '/favicon.ico', media: '(prefers-color-scheme: dark)' }
     ],
   },
 };

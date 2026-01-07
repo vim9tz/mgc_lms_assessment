@@ -31,8 +31,8 @@ export const metadata = {
     'Assessment - Take exam at ease',
    icons: {
     icon: [
-      { url: '/favicon_light.ico', media: '(prefers-color-scheme: light)' },
-      { url: '/favicon_dark.ico', media: '(prefers-color-scheme: dark)' }
+      { url: '/favicon.ico', media: '(prefers-color-scheme: light)' },
+      { url: '/favicon.ico', media: '(prefers-color-scheme: dark)' }
     ],
   },
 };
