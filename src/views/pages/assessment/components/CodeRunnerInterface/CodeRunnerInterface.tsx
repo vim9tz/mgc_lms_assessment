@@ -490,7 +490,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
 
       {/* LEFT PANEL */}
-      <div className="w-5/12 bg-white border-r flex flex-col relative">
+      <div className="w-5/12 bg-white border-r flex flex-col relative overflow-hidden">
         <div className="p-6 pb-2 bg-white z-10 sticky top-0">
              {/* TOPIC BUTTON & NAVIGATION */}
              <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
@@ -551,13 +551,31 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
              </Tabs>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 pt-4 custom-scrollbar max-w-2xl">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 pt-4 custom-scrollbar">
              {leftTab === 0 && (
                 <>
                     <div
                       className="prose max-w-none text-slate-700 leading-relaxed text-sm"
+                      style={{ 
+                        wordBreak: 'break-word', 
+                        overflowWrap: 'break-word',
+                        whiteSpace: 'pre-wrap'
+                      }}
                       dangerouslySetInnerHTML={{ __html: question.content }}
                     />
+                    <style jsx global>{`
+                      .prose pre, .prose code {
+                        white-space: pre-wrap !important;
+                        word-break: break-word !important;
+                        overflow-wrap: break-word !important;
+                        max-width: 100% !important;
+                        overflow-x: hidden !important;
+                      }
+                      .prose img, .prose table {
+                        max-width: 100% !important;
+                        overflow-x: auto !important;
+                      }
+                    `}</style>
 
                     {question.test_cases && question.test_cases.filter(tc => tc.is_public).length > 0 && (
                         <div className="mt-8">
