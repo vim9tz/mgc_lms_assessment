@@ -3,6 +3,7 @@ export interface QuestionTestCase {
   description?: string;
   input_data: string;
   expected_output: string;
+  is_public: boolean;
 }
 
 export interface Question {

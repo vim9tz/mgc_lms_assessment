@@ -134,29 +134,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 dangerouslySetInnerHTML={{ __html: question.content }}
             />
 
-            {question.test_cases && (
-                <>
-                <Typography variant="h6" className="mt-8 mb-3 text-gray-800" fontWeight={600} fontSize="0.95rem">
-                    Examples
-                </Typography>
-                {question.test_cases.map((tc, i) => (
-                    <Card key={i} variant="outlined" className="mb-3 bg-gray-50/50 border-gray-200 shadow-none">
-                        <CardContent className="!p-3">
-                            <Typography variant="subtitle2" gutterBottom className="text-gray-600 font-bold text-xs uppercase tracking-wider">
-                            {tc.description || `Example ${i + 1}`}
-                            </Typography>
-                            <div className="grid grid-cols-[60px_1fr] gap-2 text-sm mt-2 font-mono">
-                                <span className="font-semibold text-gray-500 select-none">Input:</span>
-                                <div className="text-gray-800 whitespace-pre-wrap">{tc.input_data}</div>
-                                
-                                <span className="font-semibold text-gray-500 select-none">Output:</span>
-                                <div className="text-gray-800 whitespace-pre-wrap">{tc.expected_output}</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-                </>
-            )}
+            {/* Test Cases removed from Content Panel as per request */}
       </Box>
     </div>
   );

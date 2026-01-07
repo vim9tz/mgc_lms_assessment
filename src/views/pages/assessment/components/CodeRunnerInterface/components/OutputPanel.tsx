@@ -25,29 +25,38 @@ const OutputPanel: React.FC<OutputPanelProps> = ({ result, question, view }) => 
 
       {view === "tests" && (
         <div className="space-y-3">
+          {/* INITIAL STATE: Show Count + PUBLIC test cases */}
           {!result && question?.test_cases && (
-            <div className="space-y-3">
-              {question.test_cases.map((tc, i) => (
-                <div
-                  key={i}
-                  className="p-3 rounded-lg border bg-gray-50/50 border-gray-200"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-gray-600 flex items-center gap-2 text-xs uppercase tracking-wide">
-                      Test Case {i + 1}
-                    </span>
-                    <Chip label="Pending" size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                  </div>
-                  <div className="mt-2 text-xs grid grid-cols-[60px_1fr] gap-y-2 font-mono">
-                    <span className="text-gray-400 select-none">Input:</span>
-                    <div className="text-gray-700 bg-white px-2 py-1 rounded border border-gray-100">{tc?.input_data || "N/A"}</div>
-
-                    <span className="text-gray-400 select-none">Expected:</span>
-                    <div className="text-gray-700 bg-white px-2 py-1 rounded border border-gray-100">{tc?.expected_output || "N/A"}</div>
-                  </div>
+            <>
+                <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-center mb-4">
+                   <div className="text-3xl font-bold text-gray-700 mb-1">{question.test_cases.length}</div>
+                   <div className="text-gray-500 font-medium text-sm">Test Cases Available</div>
                 </div>
-              ))}
-            </div>
+
+                {/* Show Public Test Cases */}
+                {question.test_cases.filter(tc => tc.is_public).length > 0 && (
+                    <div className="space-y-3">
+                         <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Public Test Cases</div>
+                         {question.test_cases.filter(tc => tc.is_public).map((tc, i) => (
+                            <div key={i} className="p-3 rounded-lg border bg-gray-50/50 border-gray-200">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="font-semibold text-gray-600 flex items-center gap-2 text-xs uppercase tracking-wide">
+                                    {tc.description || `Test Case ${i + 1}`}
+                                    </span>
+                                    <Chip label="Public" size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                </div>
+                                <div className="mt-2 text-xs grid grid-cols-[60px_1fr] gap-y-2 font-mono">
+                                    <span className="text-gray-400 select-none">Input:</span>
+                                    <div className="text-gray-700 bg-white px-2 py-1 rounded border border-gray-100">{tc.input_data || "N/A"}</div>
+
+                                    <span className="text-gray-400 select-none">Expected:</span>
+                                    <div className="text-gray-700 bg-white px-2 py-1 rounded border border-gray-100">{tc.expected_output || "N/A"}</div>
+                                </div>
+                            </div>
+                         ))}
+                    </div>
+                )}
+            </>
           )}
 
           {!result && !question?.test_cases && (
@@ -56,44 +65,85 @@ const OutputPanel: React.FC<OutputPanelProps> = ({ result, question, view }) => 
             </div>
           )}
 
-          {result?.test_cases?.map((tc, i) => (
-            <div
-              key={i}
-              className={`p-3 rounded-lg border transition-colors ${
-                tc.status === "passed"
-                  ? "bg-green-50/50 border-green-200"
-                  : "bg-red-50/50 border-red-200"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className={`font-semibold flex items-center gap-2 text-xs uppercase tracking-wide ${
-                    tc.status === "passed" ? "text-green-700" : "text-red-700"
+          {/* RESULT STATE: Summary + Details */}
+          {result?.test_cases && (
+             <>
+                {/* Summary Header */}
+                <div className={`p-4 rounded-lg border mb-4 flex items-center justify-between ${
+                    result.status === 'passed' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
                 }`}>
-                  Test Case {i + 1}
-                </span>
-                {tc.status === "passed" ? (
-                  <Chip label="Passed" color="success" size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
-                ) : (
-                  <Chip label="Failed" color="error" size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
-                )}
-              </div>
+                    <div className="font-semibold text-gray-700">Test Result Summary</div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Passed:</span>
+                        <span className="text-lg font-bold">
+                            {result.test_cases.filter(tc => tc.status === 'passed').length}
+                        </span>
+                        <span className="text-gray-400">/</span>
+                        <span className="text-sm text-gray-600">{result.test_cases.length}</span>
+                    </div>
+                </div>
 
-              <div className="mt-2 text-xs grid grid-cols-[60px_1fr] gap-y-2 font-mono">
-                <span className="text-gray-500 select-none">Input:</span>
-                <div className="text-gray-800 bg-white/50 px-2 py-1 rounded border border-gray-200/50">{tc.input || "N/A"}</div>
+                {/* Details List */}
+                {result.test_cases.map((tc, i) => {
+                    // Try to find matching original question test case to check public status
+                    // Note: This relies on index matching if IDs aren't fully reliable or available in result
+                    const isPublic = question?.test_cases?.[i]?.is_public;
+                    
+                    return (
+                        <div
+                        key={i}
+                        className={`p-3 rounded-lg border transition-colors ${
+                            tc.status === "passed"
+                            ? "bg-green-50/50 border-green-200"
+                            : "bg-red-50/50 border-red-200"
+                        }`}
+                        >
+                        <div className="flex items-center justify-between mb-2">
+                            <span className={`font-semibold flex items-center gap-2 text-xs uppercase tracking-wide ${
+                                tc.status === "passed" ? "text-green-700" : "text-red-700"
+                            }`}>
+                            Test Case {i + 1}
+                            </span>
+                            <div className="flex items-center gap-2">
+                                {isPublic && <Chip label="Public" size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem', borderColor: 'rgba(0,0,0,0.1)' }} />}
+                                {tc.status === "passed" ? (
+                                <Chip label="Passed" color="success" size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                ) : (
+                                <Chip label="Failed" color="error" size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                )}
+                            </div>
+                        </div>
 
-                <span className="text-gray-500 select-none">Expected:</span>
-                <div className="text-gray-800 bg-white/50 px-2 py-1 rounded border border-gray-200/50">{tc.expected_output || "N/A"}</div>
+                        <div className="mt-2 text-xs grid grid-cols-[60px_1fr] gap-y-2 font-mono">
+                            {/* Always show input/expected if Public. If Hidden, maybe hide? 
+                                User Requirement: "if public show it". Implies hide if private? 
+                                For executed results, usually you see your output. 
+                                Let's show details if Public OR if it's the User's output.
+                                But for Input/Expected, hide if private?
+                            */}
+                            
+                            <span className="text-gray-500 select-none">Input:</span>
+                            <div className="text-gray-800 bg-white/50 px-2 py-1 rounded border border-gray-200/50">
+                                {isPublic ? (tc.input || "N/A") : <span className="text-gray-400 italic">Hidden</span>}
+                            </div>
 
-                {tc.status !== "passed" && (
-                  <>
-                    <span className="text-red-500 font-bold select-none">Actual:</span>
-                    <div className="text-red-800 bg-red-100/50 px-2 py-1 rounded border border-red-200">{tc.actual_output || "N/A"}</div>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
+                            <span className="text-gray-500 select-none">Expected:</span>
+                            <div className="text-gray-800 bg-white/50 px-2 py-1 rounded border border-gray-200/50">
+                                {isPublic ? (tc.expected_output || "N/A") : <span className="text-gray-400 italic">Hidden</span>}
+                            </div>
+
+                            {tc.status !== "passed" && (
+                            <>
+                                <span className="text-red-500 font-bold select-none">Actual:</span>
+                                <div className="text-red-800 bg-red-100/50 px-2 py-1 rounded border border-red-200">{tc.actual_output || "N/A"}</div>
+                            </>
+                            )}
+                        </div>
+                        </div>
+                    );
+                })}
+             </>
+          )}
         </div>
       )}
     </Box>
