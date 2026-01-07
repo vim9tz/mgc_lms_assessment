@@ -551,7 +551,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
              </Tabs>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 pt-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 pt-4 custom-scrollbar max-w-2xl">
              {leftTab === 0 && (
                 <>
                     <div
