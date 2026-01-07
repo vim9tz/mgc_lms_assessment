@@ -142,7 +142,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
   /* ================= FETCH QUESTION ================= */
   
-  const BASE_URL = process.env.LARAVEL_API_URL || "http://localhost:8001/api";
+  const BASE_URL = process.env.LARAVEL_API_URL || "https://api.microcollege.in/api";
 
   useEffect(() => {
     const fetchQuestion = async () => {

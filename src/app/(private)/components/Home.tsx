@@ -267,7 +267,7 @@ export default function Home() {
 
     // 5. Direct Backend Submission
     // Replaced fetchFromBackend with direct fetch to match handleSubmitTest
-    const BASE_URL = process.env.LARAVEL_API_URL || 'http://localhost:8001/api';
+    const BASE_URL = process.env.LARAVEL_API_URL || 'https://api.microcollege.in/api';
     const directUrl = `${BASE_URL}/v1/assessment/submit`;
     const authToken = searchParams.get('token');
 
@@ -514,7 +514,7 @@ export default function Home() {
     console.log('🚀 Final Submission Payload:', payload);
 
     // 5. Direct Backend Submission
-    const BASE_URL = process.env.LARAVEL_API_URL || 'http://localhost:8001/api';
+    const BASE_URL = process.env.LARAVEL_API_URL || 'https://api.microcollege.in/api';
     const directUrl = `${BASE_URL}/v1/assessment/submit`;
     const authToken = searchParams.get('token'); 
 
@@ -590,7 +590,7 @@ const getAssessmentQuestions = async () => {
             return;
         }
 
-        const BASE_URL = process.env.LARAVEL_API_URL || 'http://localhost:8001/api';
+        const BASE_URL = process.env.LARAVEL_API_URL || 'https://api.microcollege.in/api';
         const directUrl = `${BASE_URL}/v1/assessment/subtopics/${subTopicId}/questions?type=${reqType}`;
 
         console.log(`Calling direct backend: ${directUrl}`);
