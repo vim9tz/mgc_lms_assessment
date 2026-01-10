@@ -96,7 +96,11 @@ export const authOptions: NextAuthOptions = {
       return session
     },
     async redirect({ url, baseUrl }) {
-      return url.startsWith(baseUrl) ? url : baseUrl
+      // Allow relative URLs
+      if (url.startsWith('/')) return `${baseUrl}${url}`
+      // Allow URLs on the same origin (including different ports if needed for dev)
+      if (new URL(url).origin === baseUrl) return url
+      return baseUrl
     }
   },
   pages: {

@@ -67,11 +67,14 @@ const UserDropdown = () => {
 
   const handleUserLogout = async () => {
     try {
-      // Sign out from the app
-      await signOut({ callbackUrl: process.env.NEXT_PUBLIC_APP_URL })
+      // Sign out from the app manually to avoid port 3000 redirect
+      if (typeof window !== 'undefined') {
+          const currentOrigin = window.location.origin;
+          await signOut({ redirect: false });
+          window.location.href = currentOrigin;
+      }
     } catch (error) {
       console.error(error)
-
       // Show above error in a toast like following
       // toastService.error((err as Error).message)
     }

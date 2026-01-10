@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 // Import Home from the private directory
 import Home from '../(private)/components/Home';
+import { useAuthStore } from '@/store/useAuthStore';
 import { enterFullscreen, isFullscreen, monitorFullscreen } from '@/utils/fullscreen';
 import { getSocket } from '@/lib/socket';
 import useApi from '@/hooks/useApi';
@@ -14,7 +15,8 @@ export default function PreviewPage() {
   const socket = getSocket();
   const { data: session } = useSession();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+  const storeToken = useAuthStore((state) => state.token);
+  const token = searchParams.get('token') || storeToken;
   const { fetchFromBackend } = useApi({ token: token || undefined });
 
   const [hydrated, setHydrated] = useState(false);

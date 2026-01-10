@@ -57,7 +57,9 @@ const RootLayout = async ({ children }: ChildrenType) => {
 
                 horizontalLayout={
                   <BlankLayout systemMode={systemMode}>
-                    {children}
+                    <AuthGuard>
+                      {children}
+                    </AuthGuard>
                   </BlankLayout>
                 }
               />

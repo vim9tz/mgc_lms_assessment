@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { signOut } from "next-auth/react";
+import { useCodeRunner } from "@/domains/code-runner/hooks/useCodeRunner";
 import {
   Button,
   Card,
@@ -36,11 +37,14 @@ import {
   NavigateBefore,
   KeyboardDoubleArrowRight,
   KeyboardDoubleArrowLeft,
-  Description
+  Description,
+  QueryStats
 } from "@mui/icons-material";
 
 // Monaco editor (client-only)
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+const ComplexityChart = dynamic(() => import("./ComplexityChart"), { ssr: false });
+import { ComplexityComparison } from "./components/ComplexityComparison";
 
 /* ================= PROPS ================= */
 
@@ -71,6 +75,9 @@ interface Question {
   starter_code?: string;
   user_code?: string;
   test_cases?: QuestionTestCase[];
+  expected_time_complexity?: string;
+  expected_space_complexity?: string;
+  submission?: SubmissionResult; // Nested submission data from backend
 }
 
 interface TopicQuestion {
@@ -92,7 +99,10 @@ interface SubmissionResult {
   status: "passed" | "failed" | "error";
   output?: string;
   runtime?: number;
+  memory?: number;
   test_cases?: TestCaseResult[];
+  time_complexity?: string;
+  space_complexity?: string;
 }
 
 /* ================= COMPONENT ================= */
@@ -109,95 +119,61 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   // State for current question ID (handling internal switching)
   const [currentQuestionId, setCurrentQuestionId] = useState<string>(propQuestionId);
 
-  const [question, setQuestion] = useState<Question | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-
-  const [code, setCode] = useState("// Loading...");
-  const [languageId, setLanguageId] = useState<number>(1);
-  const [editorLanguage, setEditorLanguage] = useState<string>("php");
-
-  const [result, setResult] = useState<SubmissionResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
-  const [leftTab, setLeftTab] = useState(0); // 0 = Description, 1 = Constraints
-
-  // Drawer & Topic Questions State
+  // Missing States
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [topicQuestions, setTopicQuestions] = useState<TopicQuestion[]>([]);
-  const [loadingTopicQuestions, setLoadingTopicQuestions] = useState(false);
+  const [activeTab, setActiveTab] = useState(0); // 0: Output, 1: Tests
+  const [leftTab, setLeftTab] = useState(0); // 0: Description, 1: Constraints
   
-  // Mobile Tab State: 0 = Problem, 1 = Code, 2 = Result
-  const [mobileTab, setMobileTab] = useState(0);
-
-  // Sync prop change
-  useEffect(() => {
-    setCurrentQuestionId(propQuestionId);
-  }, [propQuestionId]);
-
-  // Derived Navigation
-  const currentIndex = topicQuestions.findIndex(q => q.id.toString() === currentQuestionId);
-  const prevQuestionId = currentIndex > 0 ? topicQuestions[currentIndex - 1].id : null;
-  const nextQuestionId = currentIndex >= 0 && currentIndex < topicQuestions.length - 1 ? topicQuestions[currentIndex + 1].id : null;
-
-  /* ================= FETCH QUESTION ================= */
+  const [code, setCode] = useState("");
+  const [editorLanguage, setEditorLanguage] = useState("python");
+  const [languageId, setLanguageId] = useState<number>(1);
   
-  const BASE_URL = process.env.LARAVEL_API_URL || "https://api.microcollege.in/api";
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<SubmissionResult | null>(null);
 
+  // Navigation placeholders (logic needs to be connected to topicQuestions)
+  const [prevQuestionId, setPrevQuestionId] = useState<number | null>(null);
+  const [nextQuestionId, setNextQuestionId] = useState<number | null>(null);
+
+  /* ================= HOOK INTEGRATION ================= */
+
+  // Important: signOut logic is now handled in the hooks/httpClient 
+  // but if we had explicit signOut here, it should be:
+  // signOut({ callbackUrl: window.location.origin });
+  
+  // Checking existing implementation...
+  // It seems imports were fixed but let's just make sure we don't have stray signOuts.
+
+
+  const { 
+      question, 
+      loading, 
+      error, 
+      topicQuestions, 
+      loadingTopicQuestions, 
+      submitting: hookSubmitting,
+      fetchTopicQuestions,
+      submitCode
+  } = useCodeRunner(currentQuestionId, token);
+
+  // Sync hook state to local state if needed, or replace usage dependent on UI
+  // The hook handles fetching active question and topic questions.
+  
+  // We need to sync question data to local state for editor initialization 
+  // ONLY when question changes.
   useEffect(() => {
-    const fetchQuestion = async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-      try {
-        console.log("[CodeRunner] Starting fetchQuestion", { currentQuestionId, token });
-        setLoading(true);
-        setQuestion(null); 
-        setError(null);
-
-        const headers: HeadersInit = { Accept: "application/json" };
-        if (token) headers.Authorization = `Bearer ${token}`;
-
-        console.log("[CodeRunner] sending request to:", `${BASE_URL}/code-runner/questions/${currentQuestionId}`);
-        const res = await fetch(
-          `${BASE_URL}/code-runner/questions/${currentQuestionId}`,
-          { headers, signal: controller.signal }
-        );
-        clearTimeout(timeoutId);
-
-        console.log("[CodeRunner] Response received", res.status);
-
-        if (res.status === 401) {
-            console.error("Unauthorized: Redirecting to login...");
-            signOut({ callbackUrl: '/' }); 
-            return;
-        }
-
-        if (!res.ok) {
-            const text = await res.text();
-            console.error("[CodeRunner] Fetch Error Body:", text);
-            throw new Error(`Failed to fetch question: ${res.statusText}`);
-        }
-
-        const json = await res.json();
-        const data = json.data ?? json;
-
-        console.log("Question Data:", data);
-
-        setQuestion(data);
-
-        // Prep editor code
-        if (data.user_code) {
-           setCode(data.user_code);
-        } else if (data.starter_code) {
-           setCode(data.starter_code);
+     if (question) {
+        if (question.user_code) {
+           setCode(question.user_code);
+        } else if (question.starter_code) {
+           setCode(question.starter_code);
         }
         
-        if (data.programming_language_id)
-          setLanguageId(data.programming_language_id);
+        if (question.programming_language_id)
+          setLanguageId(question.programming_language_id);
 
-        if (data.programming_language) {
-          const lang = data.programming_language.toLowerCase();
+        if (question.programming_language) {
+          const lang = question.programming_language.toLowerCase();
           if (lang.includes("python")) setEditorLanguage("python");
           else if (lang.includes("java")) setEditorLanguage("java");
           else if (lang.includes("php")) setEditorLanguage("php");
@@ -205,55 +181,39 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
           else setEditorLanguage(lang);
         }
 
-        // Fetch Topic Questions if valid topic_id
-        if (data.topic_id) {
-            fetchTopicQuestions(data.topic_id, headers);
-        }
-
-      } catch (e: any) {
-        if (e.name === 'AbortError') {
-             console.error("[CodeRunner] Fetch timeout");
-             setError("Request timed out. Please check backend connection.");
+        // Prefill Result if submission exists
+        if (question.submission) {
+            setResult({
+                status: question.submission.status,
+                output: question.submission.output,
+                time_complexity: question.submission.time_complexity,
+                space_complexity: question.submission.space_complexity,
+                test_cases: question.submission.test_cases
+            });
         } else {
-             console.error("[CodeRunner] Exception:", e);
-             setError(`Unable to load question: ${e.message}`);
+            setResult(null); // Reset if no submission for this question
         }
-      } finally {
-        setLoading(false);
-      }
-    };
+     }
+  }, [question]);
 
-    if (currentQuestionId) {
-        fetchQuestion();
+  // Update navigation buttons based on topic questions list
+  useEffect(() => {
+    if (topicQuestions && topicQuestions.length > 0 && currentQuestionId) {
+        const idx = topicQuestions.findIndex(q => q.id.toString() === currentQuestionId.toString());
+        if (idx !== -1) {
+            setPrevQuestionId(idx > 0 ? topicQuestions[idx - 1].id : null);
+            setNextQuestionId(idx < topicQuestions.length - 1 ? topicQuestions[idx + 1].id : null);
+        }
     }
-  }, [currentQuestionId, token]);
+  }, [topicQuestions, currentQuestionId]);
 
-  const fetchTopicQuestions = async (topicId: number, headers: HeadersInit) => {
-      try {
-          if (topicQuestions.length > 0 && topicQuestions[0].id !== topicId) {
-             // Optimistic caching could trigger here
-          }
-          
-          setLoadingTopicQuestions(true);
-          const res = await fetch(`${BASE_URL}/code-runner/topics/${topicId}/questions`, { headers });
-          if (res.ok) {
-              const json = await res.json();
-              setTopicQuestions(json.data || []);
-          }
-      } catch (e) {
-          console.error("Failed to load topic questions", e);
-      } finally {
-          setLoadingTopicQuestions(false);
-      }
-  };
-
-  /* ================= SUBMIT CODE ================= */
 
   const handleCodeSubmit = async () => {
       try {
         setSubmitting(true);
         
         // --- RUN LOGIC (EXECUTE ON COMPILER FIRST) ---
+        // keeping this direct as requested (only refactoring microcollege api)
         const langMap: Record<string, string> = {
           python: "1", java: "2", c: "3", cpp: "4", "c++": "4", javascript: "10", js: "10", node: "10", php: "1"
         };
@@ -262,13 +222,14 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         const runPayload = {
           code,
           language: compilerLangId,
-          test_cases: question?.test_cases?.map(tc => ({ input: tc.input_data, expected_output: tc.expected_output })) || [],
+          test_cases: question?.test_cases?.map((tc: any) => ({ input: tc.input_data, expected_output: tc.expected_output })) || [],
           filename: `solution_${Date.now()}`
         };
         
         let executionData: any = null;
         try {
-            const res = await fetch("https://compilers.milliongeniuscoders.com/api/execute/", {
+            // Updated compiler URL as per user request
+            const res = await fetch("https://dev-compilers.skillryt.com/api/execute/", {
                 method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(runPayload),
             });
             if (res.ok) executionData = await res.json();
@@ -288,19 +249,26 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         
         const allPassed = mappedTestCases.length > 0 && mappedTestCases.every((tc: any) => tc.status === "passed");
         const mainOutput = executionData?.[0]?.output || "Submission Executed";
-        
+
+        // Extract Complexity
+        const timeComplexity = executionData?.[0]?.time_complexity;
+        const spaceComplexity = executionData?.[0]?.space_complexity;
+        const runtime = executionData?.[0]?.cpuTime ? parseFloat(executionData[0].cpuTime) * 1000 : 0; // Convert s to ms if needed, check API
+        const memory = executionData?.[0]?.memory ? parseFloat(executionData[0].memory) : 0; // KB usually
+
         setResult({
           status: allPassed ? "passed" : "failed",
           output: mainOutput,
-          test_cases: mappedTestCases
+          runtime: runtime,
+          memory: memory,
+          test_cases: mappedTestCases,
+          time_complexity: timeComplexity,
+          space_complexity: spaceComplexity
         });
 
-        // 2. Submit to Backend
-        const headers: HeadersInit = { "Content-Type": "application/json", Accept: "application/json" };
-        if (token) headers.Authorization = `Bearer ${token}`;
-
+        // 2. Submit to Backend using HOOK
         const backendPayload = {
-            question_id: currentQuestionId, // Use currentQuestionId state
+            question_id: currentQuestionId, 
             code,
             language_id: languageId,
             execution_results: {
@@ -308,31 +276,24 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 test_cases: mappedTestCases.map((tc: any) => ({
                     passed: tc.status === 'passed',
                     output: tc.actual_output,
-                }))
+                })),
+                time_complexity: timeComplexity,
+                space_complexity: spaceComplexity
             }
         };
 
-        const submitRes = await fetch(`${BASE_URL}/code-runner/submit`, {
-            method: "POST", headers, body: JSON.stringify(backendPayload),
-        });
-
-        if (submitRes.status === 401) {
-             signOut({ callbackUrl: '/' });
-             return;
-        }
-
-        if (!submitRes.ok) throw new Error("Submission failed");
+        const submitData = await submitCode(backendPayload);
         
         // Refresh topic questions to update 'solved' status if passed
         if (allPassed && question?.topic_id) {
-            fetchTopicQuestions(question.topic_id, headers);
+            fetchTopicQuestions(question.topic_id);
         }
         
         setActiveTab(1); // Switch to results
 
-      } catch (e) {
+      } catch (e: any) {
           console.error(e);
-          setResult({ status: "error", output: "Submission failed. Please try again." });
+          setResult({ status: "error", output: e.message || "Submission failed. Please try again." });
       } finally {
           setSubmitting(false);
       }
@@ -356,14 +317,15 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
       const payload = {
         code,
         language: compilerLangId,
-        test_cases: question?.test_cases?.map(tc => ({
+        test_cases: question?.test_cases?.map((tc: any) => ({
             input: tc.input_data,
             expected_output: tc.expected_output
         })) || [],
         filename: `solution_${Date.now()}`
       };
 
-      const res = await fetch("https://compilers.milliongeniuscoders.com/api/execute/", {
+      // Updated URL
+      const res = await fetch("https://dev-compilers.skillryt.com/api/execute/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -383,13 +345,24 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
           };
       });
 
-      const allPassed = mappedTestCases.every(tc => tc.status === "passed");
+      const allPassed = mappedTestCases.length > 0 && mappedTestCases.every(tc => tc.status === "passed");
       const mainOutput = data?.[0]?.output || "";
+      
+      const timeComplexity = data?.[0]?.time_complexity;
+      const spaceComplexity = data?.[0]?.space_complexity;
+      // API typically returns cpuTime (seconds) and memory (KB)
+      // We'll treat cpuTime as seconds and display as ms
+      const runtime = data?.[0]?.cpuTime ? parseFloat(data[0].cpuTime) * 1000 : 0; 
+      const memory = data?.[0]?.memory ? parseFloat(data[0].memory) : 0;
 
       setResult({
         status: allPassed ? "passed" : "failed",
+        runtime,
+        memory,
         output: mainOutput,
-        test_cases: mappedTestCases
+        test_cases: mappedTestCases,
+        time_complexity: timeComplexity,
+        space_complexity: spaceComplexity
       });
 
     } catch (e) {
@@ -539,6 +512,21 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                size="small"
                className="mt-2"
              />
+
+             {(result?.time_complexity || result?.space_complexity) && (
+                <div className="mt-3 flex gap-3 flex-wrap">
+                    {result.time_complexity && (
+                        <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100 font-medium">
+                            Time: {result.time_complexity}
+                        </div>
+                    )}
+                    {result.space_complexity && (
+                        <div className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100 font-medium">
+                            Space: {result.space_complexity}
+                        </div>
+                    )}
+                </div>
+             )}
         </div>
         
         {/* TAB HEADERS */}
@@ -591,40 +579,176 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                       }
                     `}</style>
 
-                    {question.test_cases && question.test_cases.filter(tc => tc.is_public).length > 0 && (
+                    {/* EXPECTED COMPLEXITY BADGES */}
+                    {(question.expected_time_complexity || question.expected_space_complexity) && (
+                        <div className="flex flex-wrap gap-4 mt-6 mb-6">
+                            {question.expected_time_complexity && (
+                                <div className="flex items-center gap-2 bg-blue-50/50 border border-blue-100 px-3 py-1.5 rounded-lg text-sm text-blue-700 shadow-sm transition-all hover:shadow-md hover:bg-blue-50">
+                                    <span className="font-semibold text-[10px] uppercase tracking-wider text-blue-400">Time</span>
+                                    <span className="font-bold font-mono">{question.expected_time_complexity}</span>
+                                </div>
+                            )}
+                            {question.expected_space_complexity && (
+                                <div className="flex items-center gap-2 bg-purple-50/50 border border-purple-100 px-3 py-1.5 rounded-lg text-sm text-purple-700 shadow-sm transition-all hover:shadow-md hover:bg-purple-50">
+                                    <span className="font-semibold text-[10px] uppercase tracking-wider text-purple-400">Space</span>
+                                    <span className="font-bold font-mono">{question.expected_space_complexity}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* LIVE EXECUTION STATS (IN DESCRIPTION) */}
+                    {result && (
+                        <div className="mb-8 mt-4 animate-in fade-in slide-in-from-top-2 duration-500">
+                             <div className="bg-white border boundary-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-3">
+                                      <div className="flex items-center gap-2">
+                                          <div className={`w-2.5 h-2.5 rounded-full ${result.status === 'passed' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-red-500'}`}></div>
+                                          <span className="font-bold tracking-tight text-sm text-slate-800">Execution Result</span>
+                                      </div>
+                                      <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${result.status === 'passed' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                          {result.status.toUpperCase()}
+                                      </span>
+                                  </div>
+
+                                  <div className="flex items-end gap-1 mb-2">
+                                      <span className={`text-3xl font-extrabold ${result.status === 'passed' ? 'text-green-600' : 'text-red-600'}`}>
+                                          {result.test_cases?.filter(tc => tc.status === 'passed').length}
+                                      </span>
+                                      <span className="text-sm text-slate-500 mb-1.5 font-medium">
+                                          / {question.test_cases?.length || 0} Test Cases Passed
+                                      </span>
+                                  </div>
+                                  
+                                  {/* Progress Bar */}
+                                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-4 border border-slate-200">
+                                      <div 
+                                        className={`h-full rounded-full transition-all duration-1000 ease-out ${result.status === 'passed' ? 'bg-green-500' : 'bg-orange-500'}`}
+                                        style={{ width: `${(result.test_cases?.filter(tc => tc.status === 'passed').length || 0) / (question.test_cases?.length || 1) * 100}%` }}
+                                      ></div>
+                                  </div>
+
+                                  {(result.time_complexity || result.space_complexity) && (
+                                     <div className="flex flex-col gap-4 pt-3 border-t border-slate-100">
+                                         {/* Text Stats */}
+                                         <div className="flex gap-4">
+                                            {result.time_complexity && (
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Time Complexity</span>
+                                                    <span className="text-xs font-mono font-semibold text-blue-600 mt-0.5 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 inline-block w-fit">{result.time_complexity}</span>
+                                                </div>
+                                            )}
+                                            {result.space_complexity && (
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Space Complexity</span>
+                                                    <span className="text-xs font-mono font-semibold text-purple-600 mt-0.5 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100 inline-block w-fit">{result.space_complexity}</span>
+                                                </div>
+                                            )}
+                                         </div>
+
+                                       {(question.expected_time_complexity || question.expected_space_complexity) && (
+  <div className="relative overflow-hidden mt-6 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+    {/* Subtle Background */}
+    <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-slate-50/50 to-white/0" />
+    
+    <div className="relative rounded-xl p-6 bg-white/60">
+      {/* Header with improved typography */}
+      <div className="flex flex-col items-center mb-8">
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500/60">
+          Analytics Engine
+        </span>
+        <h3 className="text-lg font-bold text-slate-800">
+          Performance Analysis
+        </h3>
+        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-blue-400 to-purple-400" />
+      </div>
+
+      {/* Charts Grid - Fixed width and spacing */}
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        {/* Time Complexity Card */}
+        {question.expected_time_complexity && result.time_complexity && (
+          <div className="group relative flex flex-col items-center rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition-all hover:bg-white hover:shadow-md hover:border-slate-200">
+            <div className="w-full flex justify-center overflow-visible"> 
+              {/* Ensure ComplexityChart has 'responsive: true' in its config */}
+              <ComplexityChart
+                type="Time"
+                expected={question.expected_time_complexity}
+                actual={result.time_complexity}
+              />
+            </div>
+            <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-blue-600 transition-colors">
+              Runtime Efficiency
+            </p>
+          </div>
+        )}
+
+        {/* Space Complexity Card */}
+        {question.expected_space_complexity && result.space_complexity && (
+          <div className="group relative flex flex-col items-center rounded-xl border border-slate-100 bg-slate-50/50 p-6 transition-all hover:bg-white hover:shadow-md hover:border-slate-200">
+            <div className="w-full flex justify-center overflow-visible">
+              <ComplexityChart
+                type="Space"
+                expected={question.expected_space_complexity}
+                actual={result.space_complexity}
+              />
+            </div>
+            <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-purple-600 transition-colors">
+              Memory Footprint
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+                                     </div>
+                                  )}
+                             </div>
+                        </div>
+                    )}
+
+                    {question.test_cases && question.test_cases.filter((tc: any) => tc.is_public).length > 0 && (
                         <div className="mt-8">
-                             <Accordion defaultExpanded variant="outlined" sx={{ borderRadius: 2 }}>
-                                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                     <Typography variant="subtitle2" fontWeight={700}>Examples</Typography>
-                                 </AccordionSummary>
-                                 <AccordionDetails sx={{ p: 0 }}>
-                                     <div className="flex flex-col">
-                                         {question.test_cases.filter(tc => tc.is_public).map((tc, i) => (
-                                             <div key={i} className={`p-4 ${i !== 0 ? 'border-t border-slate-100' : ''}`}>
-                                                 <div className="flex items-start gap-4 text-xs font-mono">
-                                                     <div className="flex-1">
-                                                         <span className="text-slate-500 font-semibold block mb-1">Input:</span>
-                                                         <div className="bg-slate-50 p-2 rounded border border-slate-200 text-slate-800 break-all">
-                                                             {tc.input_data}
-                                                         </div>
-                                                     </div>
-                                                     <div className="flex-1">
-                                                         <span className="text-slate-500 font-semibold block mb-1">Output:</span>
-                                                         <div className="bg-slate-50 p-2 rounded border border-slate-200 text-slate-800 break-all">
-                                                             {tc.expected_output}
-                                                         </div>
-                                                     </div>
-                                                 </div>
+                             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                <span className="w-1 h-4 bg-indigo-500 rounded-full inline-block"></span>
+                                Example Test Cases
+                             </h3>
+                             
+                             <div className="flex flex-col gap-4">
+                                 {question.test_cases.filter((tc: any) => tc.is_public).map((tc: any, i: number) => (
+                                     <div key={i} className="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+                                         <div className="absolute top-0 left-0 w-1 h-full bg-slate-200 group-hover:bg-indigo-500 transition-colors"></div>
+                                         
+                                         <div className="p-4 pl-6">
+                                             <div className="flex justify-between items-center mb-3">
+                                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Example {i + 1}</span>
                                                  {tc.description && (
-                                                     <div className="mt-2 text-xs text-slate-500 italic">
-                                                         Note: {tc.description}
-                                                     </div>
+                                                     <span className="text-xs text-slate-500 italic bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{tc.description}</span>
                                                  )}
                                              </div>
-                                         ))}
+                                             
+                                             <div className="grid gap-3">
+                                                 <div>
+                                                     <div className="flex items-center gap-2 mb-1">
+                                                         <span className="text-xs font-semibold text-slate-600">Input</span>
+                                                     </div>
+                                                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-mono text-sm text-slate-700 overflow-x-auto">
+                                                         {tc.input_data}
+                                                     </div>
+                                                 </div>
+                                                 <div>
+                                                     <div className="flex items-center gap-2 mb-1">
+                                                         <span className="text-xs font-semibold text-slate-600">Output</span>
+                                                     </div>
+                                                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-mono text-sm text-slate-700 overflow-x-auto">
+                                                         {tc.expected_output}
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         </div>
                                      </div>
-                                 </AccordionDetails>
-                             </Accordion>
+                                 ))}
+                             </div>
                         </div>
                     )}
                 </>
@@ -720,6 +844,17 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 py: 1
               }}
             />
+            <Tab
+              icon={<QueryStats sx={{ fontSize: 16 }} />}
+              iconPosition="start"
+              label="Analysis"
+              sx={{ 
+                minHeight: 40, 
+                fontSize: '0.75rem', 
+                textTransform: 'none', 
+                py: 1
+              }}
+            />
           </Tabs>
           </div>
 
@@ -755,8 +890,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                       <div className="space-y-1">
                           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 pl-1">Public Test Cases</div>
                           
-                          {question.test_cases.filter(tc => tc.is_public).length > 0 ? (
-                              question.test_cases.filter(tc => tc.is_public).map((tc, i) => (
+                          {question.test_cases.filter((tc: any) => tc.is_public).length > 0 ? (
+                              question.test_cases.filter((tc: any) => tc.is_public).map((tc: any, i: number) => (
                                  <div key={i} className="group flex flex-col gap-1 p-2 rounded-md border border-transparent hover:bg-gray-50 hover:border-gray-100 transition-all">
                                      <div className="flex items-center justify-between">
                                          <span className="text-xs font-semibold text-gray-700">{tc.description || `Case ${i + 1}`}</span>
@@ -818,6 +953,21 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                      </div>
                   )}
                </div>
+            )}
+
+            {activeTab === 2 && (
+                <div className="p-4">
+                    <ComplexityComparison 
+                        code={code} 
+                        language={editorLanguage}
+                        compilerStats={{
+                            runtime: result?.runtime || 0,
+                            memory: result?.memory || 0,
+                            timeComplexity: result?.time_complexity,
+                            spaceComplexity: result?.space_complexity
+                        }}
+                    />
+                </div>
             )}
           </Box>
         </div>

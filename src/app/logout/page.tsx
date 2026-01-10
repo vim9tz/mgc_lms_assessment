@@ -7,7 +7,13 @@ function LogOut () {
 
     useEffect(() => {
         // Clear session storage on logout
-        signOut({ redirect: true, callbackUrl: '/login' })
+        const performLogout = async () => {
+             if (typeof window !== 'undefined') {
+                 await signOut({ redirect: false });
+                 window.location.href = `${window.location.origin}/login`;
+             }
+        };
+        performLogout();
     }, [])
 
   return (

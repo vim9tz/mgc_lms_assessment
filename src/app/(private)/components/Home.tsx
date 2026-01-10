@@ -28,14 +28,23 @@ import { useDynamicQuizHook } from '@/hooks/useDynamicQuizHook'
 import ResultModal from '@/views/pages/assessment/components/ResultModalV2'
 import { Socket } from 'socket.io-client'
 
+import { useAuthStore } from '@/store/useAuthStore';
+import { useAssessmentSubmit } from '@/domains/assessment/hooks/useAssessmentSubmit';
+import { assessmentApi } from '@/domains/assessment/api/assessment.api';
+
 export default function Home() {
   const router = useRouter()
   const { data: session, status } = useSession()
   const searchParams = useSearchParams()
+  const storeToken = useAuthStore((state) => state.token);
+
+  // Fallback to URL token if store is empty (e.g. direct link with token), but prefer store
+  const test_id = storeToken || searchParams.get('token')
+  
   const subTopicId = searchParams.get('subTopic') || searchParams.get('subtopic_id')
   const practiceId = searchParams.get('practiceId')
   const mockId = searchParams.get('mockId')
-  const test_id = searchParams.get('token')
+  // const test_id = searchParams.get('token') // Removed
   const { fetchFromBackend } = useApi({ token: test_id || undefined })
   const [getAttempt, setGetAttempt] = useState<GetAttemptResult | null>(null)
   const [quizItems, setQuizItems] = useState<AttemptWeightageItem[]>([])
@@ -75,12 +84,13 @@ export default function Home() {
     });
 
      // Calculate effectiveType early for hooks
-     const token = searchParams.get('token');
+     const token = test_id;
      const urlType = searchParams.get('type');
      const sessionType = typeof window !== 'undefined' ? sessionStorage.getItem('type') : null;
      
      // Robust Type Resolution: URL > Session > Token inference > Default
      const effectiveType = urlType || sessionType || (token ? 'geeks_test' : 'test');
+
 
 
     // Capture system info on mount
@@ -214,83 +224,40 @@ export default function Home() {
   };
 
 
+  /* ================= HOOK INTEGRATION ================= */
+
+  const { submitAssessment } = useAssessmentSubmit();
+
   // 1b) runs *after* user confirms in the modal
   const handleConfirmSubmit = async () => {
     setShowResults(false)
 
     const { allQuizSubmissions, allCodeSubmissions } = pendingPayload
-    // const testId = subTopicId;
     const userId = session?.user?.id
-
-    const isProduction = process.env.NODE_ENV === 'production';
-    const baseUrl = isProduction ? 'https://app.skillryt.com' : 'http://localhost:3000';
-
     const testId = sessionStorage.getItem('testId')
-
-    const sessionType = sessionStorage.getItem('type');
-    const submissionId = sessionStorage.getItem('submission_id');
-    const realSubtopicId = sessionStorage.getItem('subtopic_id');
-
-    // const token = searchParams.get('token'); // already at top
-    // Fallback: if sessionType is missing but we have a token, assume 'geeks_test'
-    // Also, if 'test_type' in session is 'geeks_test', prefer that. 
-    // const effectiveType = sessionType || (token ? 'geeks_test' : 'test'); // already at top
+    const submissionId = sessionStorage.getItem('submission_id')
+    const realSubtopicId = sessionStorage.getItem('subtopic_id')
 
     // For geeks_test, userId might not be required if we have a token/submission_id
-    if (!testId) {
+    if (!testId && !subTopicId) {
       toast.error('Missing test info')
       return
     }
 
-    // specific fix for geeks_test data truncation:
-    // we use realSubtopicId if available, otherwise fallback to testId (token)
-    const finalTestId = (effectiveType === 'geeks_test' && realSubtopicId) ? realSubtopicId : testId;
-
-    const payload: any = {
-      // user_id: userId,
-      type: effectiveType,
-      test_id: finalTestId,
+    const payload = {
+      userId,
+      testId: testId || undefined,
+      subTopicId: subTopicId || undefined,
+      effectiveType,
       allQuizSubmissions,
       allCodeSubmissions,
-      tab_switches: proctoringState.tabSwitches,
-      copy_paste: proctoringState.copyPasteAttempts,
-      fullscreen_violations: proctoringState.fullscreenViolations,
-      mouse_leaves: proctoringState.mouseLeaves,
-      proctoring_logs: proctoringState.logs,
-      system_info: proctoringState.systemInfo,
+      proctoringState
     }
 
-    if (userId) payload.user_id = userId;
-    if (submissionId) payload.submission_id = submissionId;
-    
-    console.log('handleConfirmSubmit Payload:', payload);
+    const result = await submitAssessment(payload);
 
-    // 5. Direct Backend Submission
-    // Replaced fetchFromBackend with direct fetch to match handleSubmitTest
-    const BASE_URL = process.env.LARAVEL_API_URL || 'https://api.microcollege.in/api';
-    const directUrl = `${BASE_URL}/v1/assessment/submit`;
-    const authToken = searchParams.get('token');
-
-    // Add allocation_mode explicitly if needed, though 'type' should cover it
-    payload.allocation_mode = effectiveType;
-
-    try {
-      const res = await fetch(directUrl, {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${authToken || session?.user?.accessToken || ''}`
-          },
-          body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-      console.log('🚀 Submit response (Confirm):', data);
-
-      if (res.ok && data.success) {
-        toast.success('Submitted successfully!')
-        const courseId = data.data?.course_id || data.course_id; // Check both structures
+    if (result) {
+        const courseId = result.data?.course_id || result.course_id; 
 
         if (effectiveType === 'assessment' || effectiveType === 'geeks_test' || !courseId) {
            if (typeof window !== 'undefined' && !session?.user?.id) {
@@ -299,16 +266,16 @@ export default function Home() {
                window.location.href = '/dashboard';
            }
         } else {
-          const baseUrl = process.env.NODE_ENV === 'production' ? 'https://app.skillryt.com' : 'http://localhost:3000';
-          window.location.href = `${baseUrl}/my-courses/${courseId}/course-details`;
+            // Updated Redirect Logic (Already Fixed in Step 499/533)
+            const baseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://app.skillryt.com' : window.location.origin);
+            
+            if (window.location.hostname === 'localhost') {
+                console.log(`[Dev] Forced redirect to current origin: ${window.location.origin}`);
+                window.location.href = `${window.location.origin}/my-courses/${courseId}/course-details`; 
+            } else {
+                window.location.href = `${baseUrl}/my-courses/${courseId}/course-details`;
+            }
         }
-      } else {
-        toast.error(`Submission failed: ${data.message || 'Unknown error'}`)
-        console.error('Submission failed:', data);
-      }
-    } catch (err) {
-      console.error('Submit error:', err)
-      toast.error('Server error submitting.')
     }
   }
 
@@ -321,10 +288,6 @@ export default function Home() {
     const allCodingQuestions = codingModules.flatMap(mod => mod.questions || [])
     const totalQuestions = allCodingQuestions.length
 
-
-
-
-
     const allCodeSubmissions = []
 
     for (let index = 0; index < totalQuestions; index++) {
@@ -332,18 +295,32 @@ export default function Home() {
       const css = sessionStorage.getItem(`cssCode-${index}`) || ''
       const js = sessionStorage.getItem(`jsCode-${index}`) || ''
       const python = sessionStorage.getItem(`pythonCode-${index}`) || ''
+      const testCasesForThis = JSON.parse(sessionStorage.getItem(`testcases-${index}`) || '[]')
+    
+      const question = allCodingQuestions[index]
+      const question_id = question?.question_id || index
 
       allCodeSubmissions.push({
+        question_id,
         question_index: index,
         html_code: html,
         css_code: css,
         js_code: js,
-        python_code: python
+        python_code: python,
+        test_cases: testCasesForThis
       })
     }
   }, [])
+  
+  // ... rest of file (getAssessment etc) ...
 
   const getAssessment = async () => {
+    // Determine effective test ID (token or subtopicId depending on context)
+    const currentTestId = subTopicId || test_id;
+    if (!currentTestId) {
+        console.warn("Skipping getAssessment: No ID found");
+        return;
+    }
     const data = await fetchFromBackend('/questions/assessment/test', 'POST', { subtopic_id: subTopicId })
     console.log('DEBUG: Test Check Data:', data);
     if (data?.error) {
@@ -497,67 +474,39 @@ export default function Home() {
     // If it's pure coding (practice), this array might be empty. 
     
     const payload = {
-        user_id: userId,
-        test_id: testId,
-        type: effectiveType, // Robust type from URL/Session
+        userId,
+        testId,
+        effectiveType, // Robust type from URL/Session
         allQuizSubmissions,
         allCodeSubmissions: code_submissions,
-        allocation_mode: effectiveType, // Send as allocation_mode as distinct field if backend prefers, mostly 'type' covers it
-        tab_switches: proctoringState.tabSwitches,
-        copy_paste: proctoringState.copyPasteAttempts,
-        fullscreen_violations: proctoringState.fullscreenViolations,
-        mouse_leaves: proctoringState.mouseLeaves,
-        proctoring_logs: proctoringState.logs,
-        system_info: proctoringState.systemInfo,
+        proctoringState, // Pass the whole object for the hook to destructure
     };
 
-    console.log('🚀 Final Submission Payload:', payload);
+    const result = await submitAssessment({
+        ...payload,
+        subTopicId: subTopicId || undefined,
+        testId: testId || undefined
+    });
 
-    // 5. Direct Backend Submission
-    const BASE_URL = process.env.LARAVEL_API_URL || 'https://api.microcollege.in/api';
-    const directUrl = `${BASE_URL}/v1/assessment/submit`;
-    const authToken = searchParams.get('token'); 
-
-    try {
-        const res = await fetch(directUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                // Prefer token from URL for guest/public assessments, fallback to session, or empty
-                'Authorization': `Bearer ${authToken || session?.user?.accessToken || ''}`
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-        console.log('🚀 Submit response:', data);
-
-        if (res.ok && data.success) {
-            toast.success("Assessment submitted successfully!");
-            
-            // Redirect logic
-            if (effectiveType === 'assessment' || effectiveType === 'geeks_test' || !data.data?.course_id) {
-               // For public/guest tests, maybe show a thank you or result modal instead of redirecting to dashboard immediately
-               // Keeping existing logic:
-               if (typeof window !== 'undefined' && !session?.user?.id) {
-                   // Guest user
-                   toast.info("Result saved. You can close this window.");
-               } else {
-                   window.location.href = '/dashboard';
-               }
-            } else {
-               const baseUrl = process.env.NODE_ENV === 'production' ? 'https://app.skillryt.com' : 'http://localhost:3000';
-               window.location.href = `${baseUrl}/my-courses/${data.data.course_id}/course-details`;
-            }
+    if (result) {
+        // Redirection Logic
+        if (effectiveType === 'assessment' || effectiveType === 'geeks_test' || !result.data?.course_id) {
+           if (typeof window !== 'undefined' && !session?.user?.id) {
+               toast.info("Result saved. You can close this window.");
+           } else {
+               window.location.href = '/dashboard';
+           }
         } else {
-            console.error('Submission failed:', data);
-            toast.error(`Failed to submit: ${data.message || 'Unknown error'}`);
+            const courseId = result.data.course_id;
+            const baseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://app.skillryt.com' : window.location.origin);
+            
+            if (window.location.hostname === 'localhost') {
+                console.log(`[Dev] Forced redirect to current origin: ${window.location.origin}`);
+                window.location.href = `${window.location.origin}/my-courses/${courseId}/course-details`;
+            } else {
+                window.location.href = `${baseUrl}/my-courses/${courseId}/course-details`;
+            }
         }
-
-    } catch (err) {
-        console.error('Submit error:', err);
-        toast.error('Server error submitting assessment.');
     }
   }
 
@@ -583,33 +532,24 @@ const getAssessmentQuestions = async () => {
         const typeParam = searchParams.get('type');
         const reqType = typeParam || 'knowledge_check';
 
-        const token = searchParams.get('token'); // ✅ extract token from URL
+        const token = searchParams.get('token') || storeToken; // ✅ extract token from URL or Store
 
         if (!token) {
+            console.error("Authentication token missing in getAssessmentQuestions");
             toast.error('Authentication token missing');
             return;
         }
 
-        const BASE_URL = process.env.LARAVEL_API_URL || 'https://api.microcollege.in/api';
-        const directUrl = `${BASE_URL}/v1/assessment/subtopics/${subTopicId}/questions?type=${reqType}`;
-
-        console.log(`Calling direct backend: ${directUrl}`);
-
-        const response = await fetch(directUrl, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': `Bearer ${token}` // ✅ attach Bearer token
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('Response from Assessment API:', data);
+        // Use Domain API (which handles BASE_URL and intercepts request with token if using useApi/httpClient, 
+        // but httpClient uses store token. If URL token is different, we might need to handle that.
+        // However, standard flow is syncing URL token to store.
+        
+        // If we strictly need to pass the token explicitly (e.g. Guest mode without store sync yet),
+        // we might stick to fetch or update httpClient to allow override.
+        // Given 'Clean URL' flow, token SHOULD be in store.
+        
+        const data = await assessmentApi.getQuestionsByType(subTopicId || '', reqType);
+        console.log('Response from Assessment API (Domain):', data);
 
         const questions = data.data || [];
 

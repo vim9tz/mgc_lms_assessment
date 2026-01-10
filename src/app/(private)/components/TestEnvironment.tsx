@@ -32,7 +32,12 @@ export const InvalidTestScreen = () => {
           Go to Dashboard
         </button>
         <button
-          onClick={() => signOut()}
+          onClick={async () => {
+             if (typeof window !== 'undefined') {
+                 await signOut({ redirect: false });
+                 window.location.href = `${window.location.origin}/login`;
+             }
+          }}
           className="px-5 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
         >
           Sign Out

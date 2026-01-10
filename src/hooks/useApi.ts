@@ -58,7 +58,12 @@ const useApi = (options: boolean | UseApiOptions = false) => {
 
       if (!guest && !token) {
         console.error('❌ Unauthorized: No token found, signing out...');
-        signOut({ callbackUrl: process.env.NEXT_PUBLIC_APP_URL || '/' });
+        if (typeof window !== 'undefined') {
+             const currentOrigin = window.location.origin;
+             signOut({ redirect: false }).then(() => {
+                 window.location.href = currentOrigin; 
+             });
+        }
         return { error: 'Unauthorized', status: 401 };
       }
 
@@ -85,7 +90,12 @@ const useApi = (options: boolean | UseApiOptions = false) => {
 
         if (!guest && response.status === 401) {
           console.error('❌ Unauthorized: Redirecting to login...');
-          signOut({ callbackUrl: process.env.NEXT_PUBLIC_APP_URL || '/' });
+          if (typeof window !== 'undefined') {
+               const currentOrigin = window.location.origin;
+               signOut({ redirect: false }).then(() => {
+                   window.location.href = currentOrigin;
+               });
+          }
           return { error: 'Unauthorized', status: 401 };
         }
 

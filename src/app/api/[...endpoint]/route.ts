@@ -82,7 +82,12 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
-  const body = await req.json();
+  let body = {};
+  try {
+    body = await req.json();
+  } catch (e) {
+    // Body might be empty
+  }
   const { endpoint } = await params;
 
   const laravelEndpoint = resolveLaravelEndpoint(endpoint, 'POST', body);
