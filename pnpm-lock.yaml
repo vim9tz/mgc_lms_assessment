@@ -156,9 +156,6 @@ importers:
       axios:
         specifier: ^1.13.2
         version: 1.13.2
-      big-o-calculator:
-        specifier: ^0.0.3
-        version: 0.0.3
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2157,9 +2154,6 @@ packages:
     resolution: {integrity: sha512-Xm7bpRXnDSX2YE2YFfBk2FnF0ep6tmG7xPh8iHee8MIcrgq762Nkce856dYtJYLkuIoYZvGfTs/PbZhideTcEg==}
     engines: {node: '>=4'}
 
-  axios@0.21.4:
-    resolution: {integrity: sha512-ut5vewkiu8jjGBdqpM44XxjuCjq9LAKeHVmoVfHVzy8eHgxxq8SbAVQNovDA8mVi05kP0Ea/n/UzcSHcTJQfNg==}
-
   axios@1.13.2:
     resolution: {integrity: sha512-VPk9ebNqPcy5lRGuSlKx752IlDatOjT9paPlm8A7yOuW2Fbvp4X3JznJtT4f0GzGLLiWE9W8onz51SqLYwzGaA==}
 
@@ -2176,9 +2170,6 @@ packages:
 
   before-after-hook@4.0.0:
     resolution: {integrity: sha512-q6tR3RPqIB1pMiTRMFcZwuG5T8vwp+vUvEG0vuI6B+Rikh5BfPp2fQ82c925FOs+b0lcFQ8CFrL+KbilfZFhOQ==}
-
-  big-o-calculator@0.0.3:
-    resolution: {integrity: sha512-CAHh0QfMFV2bNRY588XRmYHcbzsb9UrTf8matAB4mEYxQ97/PDoUu5nTps9X74AuMSDRnB5e8uWvaxnNBwNuqQ==}
 
   binary-extensions@2.3.0:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
@@ -6597,13 +6588,6 @@ snapshots:
 
   axe-core@4.10.3: {}
 
-  axios@0.21.4:
-    dependencies:
-      follow-redirects: 1.15.9
-    transitivePeerDependencies:
-      - debug
-    optional: true
-
   axios@1.13.2:
     dependencies:
       follow-redirects: 1.15.9
@@ -6623,14 +6607,6 @@ snapshots:
   balanced-match@1.0.2: {}
 
   before-after-hook@4.0.0: {}
-
-  big-o-calculator@0.0.3:
-    dependencies:
-      tslib: 2.8.1
-    optionalDependencies:
-      axios: 0.21.4
-    transitivePeerDependencies:
-      - debug
 
   binary-extensions@2.3.0: {}
 
