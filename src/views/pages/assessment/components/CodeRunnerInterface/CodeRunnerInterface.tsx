@@ -269,7 +269,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         let executionData: any = null;
         try {
             // Updated compiler URL as per user request
-            const res = await fetch("https://dev-compilers.skillryt.com/api/execute/", {
+            const res = await fetch("https://compilers.milliongeniuscoders.com/api/execute/", {
                 method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(runPayload),
             });
             if (res.ok) executionData = await res.json();
@@ -365,7 +365,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
       };
 
       // Updated URL
-      const res = await fetch("https://dev-compilers.skillryt.com/api/execute/", {
+      const res = await fetch("https://compilers.milliongeniuscoders.com/api/execute/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
