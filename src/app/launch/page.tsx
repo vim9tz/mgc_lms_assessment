@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { CircularProgress } from '@mui/material';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSSOExchange } from '@/domains/auth/hooks/useSSOExchange';
+import AssessmentLoading from '@/views/pages/assessment/components/AssessmentLoading';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,16 +76,13 @@ function LaunchContent() {
     }, [searchParams, router, exchange, setToken]);
 
     return (
-        <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
-            <CircularProgress size={40} className="mb-4" />
-            <p className="text-gray-600 font-medium">{status}</p>
-        </div>
+       <AssessmentLoading />
     );
 }
 
 export default function LaunchPage() {
     return (
-        <Suspense fallback={<div className="flex flex-col items-center justify-center h-screen bg-gray-50"><CircularProgress size={40} /></div>}>
+        <Suspense fallback={<AssessmentLoading />}>
             <LaunchContent />
         </Suspense>
     );

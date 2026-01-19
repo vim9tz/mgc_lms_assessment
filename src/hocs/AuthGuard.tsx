@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
-import { CircularProgress } from '@mui/material'
+import AssessmentLoading from '@/views/pages/assessment/components/AssessmentLoading'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -11,11 +11,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [isChecking, setIsChecking] = useState(true)
 
   useEffect(() => {
-    console.log('AuthGuard Check:', { token, hasHydrated })
-    
     // If we have a token, we represent a valid session (either rehydrated or just set)
     if (token) {
-      console.log('AuthGuard: Access granted (Token Present)')
       setIsChecking(false)
       return
     }
@@ -24,21 +21,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!hasHydrated) return
 
     // If hydrated and still no token...
-    console.warn('AuthGuard: Access denied, redirecting to login')
     router.replace('/login')
   }, [token, hasHydrated, router])
 
   if (isChecking) {
-    return (
-      <div className="flex flex-col h-screen w-screen items-center justify-center bg-background gap-4">
-        <CircularProgress />
-        <div className="text-sm text-muted-foreground">
-          Checking Authentication...<br/>
-          Hydrated: {String(hasHydrated)}<br/>
-          Token Present: {String(!!token)}
-        </div>
-      </div>
-    )
+    return <AssessmentLoading />
   }
 
   return <>{children}</>
