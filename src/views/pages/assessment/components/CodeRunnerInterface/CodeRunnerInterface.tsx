@@ -15,14 +15,18 @@ import {
   Box,
   Tab,
   Tabs,
-  Drawer,
-  IconButton,
-  List,
   ListItem,
   ListItemButton,
   ListItemText,
   ListItemIcon,
-  Tooltip
+  Tooltip,
+  Drawer,
+  IconButton,
+  List,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from "@mui/material";
 import {
   PlayArrow,
@@ -37,7 +41,8 @@ import {
   NavigateBefore,
   KeyboardDoubleArrowRight,
   KeyboardDoubleArrowLeft,
-  Description
+  Description,
+  Visibility
 } from "@mui/icons-material";
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 
@@ -108,6 +113,7 @@ interface SubmissionResult {
 
 import { Accordion, AccordionSummary, AccordionDetails } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import PythonVisualizer from "./PythonVisualizer";
 import ThreePaneLayout from "../ThreePaneLayout";
 import AssessmentLoading from "../AssessmentLoading";
 
@@ -131,6 +137,9 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmissionResult | null>(null);
+
+  // Visualizer State
+  const [showVisualizer, setShowVisualizer] = useState(false);
 
   // Navigation placeholders (logic needs to be connected to topicQuestions)
   const [prevQuestionId, setPrevQuestionId] = useState<number | null>(null);
@@ -663,6 +672,24 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                  >
                     Run
                  </Button>
+                     <Button
+                        variant="outlined"
+                        color="inherit"
+                        size="small"
+                        onClick={() => setShowVisualizer(true)}
+                        startIcon={<Visibility sx={{ fontSize: 18 }} />}
+                        sx={{ 
+                            textTransform: 'none', 
+                            fontWeight: 600, 
+                            borderRadius: '8px', 
+                            color: 'text.secondary', 
+                            borderColor: 'divider',
+                            fontSize: '0.85rem',
+                            '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } 
+                        }}
+                     >
+                        Visualizer
+                     </Button>
                  <Button
                     variant="contained"
                     color="primary"
@@ -934,6 +961,27 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         renderRightTopHeader={renderRightTopHeader}
         renderRightBottomHeader={renderRightBottomHeader}
       />
+      
+      {/* VISUALIZER DIALOG */}
+      <Dialog 
+        open={showVisualizer} 
+        onClose={() => setShowVisualizer(false)}
+        maxWidth="xl"
+        fullWidth
+        PaperProps={{
+            sx: { height: '85vh', borderRadius: 3 }
+        }}
+      >
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', px: 3, py: 2 }}>
+              <Typography variant="h6" fontWeight={700}>Code Visualization</Typography>
+              <IconButton onClick={() => setShowVisualizer(false)} size="small">
+                  <CloseIcon />
+              </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ p: 0, overflow: 'auto', height: '100%' }}>
+              <PythonVisualizer code={code} onChangeCode={setCode} />
+          </DialogContent>
+      </Dialog>
     </div>
   );
 };
