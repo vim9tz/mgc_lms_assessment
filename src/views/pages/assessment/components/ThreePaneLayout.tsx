@@ -1,18 +1,28 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Transition } from 'framer-motion';
 import { 
-  Maximize2, 
-  Minimize2, 
   ChevronLeft, 
   ChevronRight, 
   ChevronDown, 
   ChevronUp,
-  GripVertical,
-  GripHorizontal,
-  Terminal
 } from 'lucide-react';
+
+export const WindowMaximizeIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="5" />
+    <path d="M3 9h18" opacity="0.4" strokeWidth="2" />
+  </svg>
+);
+
+export const WindowRestoreIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 9V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3" strokeWidth="2" opacity="0.4" />
+    <rect x="4" y="9" width="11" height="11" rx="3" />
+    <path d="M4 13h11" opacity="0.4" strokeWidth="2" />
+  </svg>
+);
 
 export type PaneType = 'none' | 'left' | 'editor' | 'output';
 
@@ -23,11 +33,18 @@ interface ThreePaneLayoutProps {
   leftTitle?: string;
   rightTopTitle?: string;
   rightBottomTitle?: string;
-  // Custom header render functions that receive layout controls
   renderLeftHeader?: (props: { isMaximized: boolean; isCollapsed: boolean; onMaximize: () => void; onCollapse: () => void }) => React.ReactNode;
   renderRightTopHeader?: (props: { isMaximized: boolean; isCollapsed: boolean; onMaximize: () => void; onCollapse: () => void }) => React.ReactNode;
   renderRightBottomHeader?: (props: { isMaximized: boolean; isCollapsed: boolean; onMaximize: () => void; onCollapse: () => void }) => React.ReactNode;
 }
+
+const TRANSITION: Transition = { 
+  type: 'spring', 
+  stiffness: 350, 
+  damping: 32, 
+  mass: 0.8,
+  restDelta: 0.001 
+};
 
 export default function ThreePaneLayout({
   leftContent,
@@ -40,231 +57,232 @@ export default function ThreePaneLayout({
   renderRightTopHeader,
   renderRightBottomHeader
 }: ThreePaneLayoutProps) {
-  // --- STATE ---
   const [maximizedPanel, setMaximizedPanel] = useState<PaneType>('none');
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
   const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
-
-  // Resize State
-  const [leftWidth, setLeftWidth] = useState(40); // Percentage
-  const [rightTopHeight, setRightTopHeight] = useState(60); // Percentage
+  const [leftWidth, setLeftWidth] = useState(40);
+  const [rightTopHeight, setRightTopHeight] = useState(55);
   const [isResizing, setIsResizing] = useState<'vertical' | 'horizontal' | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- RESIZE HANDLERS ---
-  const startVerticalResize = (e: React.MouseEvent) => {
+  const startResize = (type: 'vertical' | 'horizontal') => (e: React.MouseEvent) => {
     e.preventDefault();
-    setIsResizing('vertical');
+    setIsResizing(type);
   };
 
-  const startHorizontalResize = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing('horizontal');
-  };
+  const stopResize = useCallback(() => setIsResizing(null), []);
 
-  const stopResize = useCallback(() => {
-    setIsResizing(null);
-  }, []);
+  const resize = useCallback((e: MouseEvent) => {
+    if (!isResizing || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
 
-  const resize = useCallback(
-    (e: MouseEvent) => {
-        if (!isResizing || !containerRef.current) return;
-
-        const containerRect = containerRef.current.getBoundingClientRect();
-
-        if (isResizing === 'vertical') {
-            // Calculate new left width percentage
-            const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-            // Constraints: Min 20%, Max 80%
-            if (newLeftWidth >= 20 && newLeftWidth <= 80) {
-                setLeftWidth(newLeftWidth);
-            }
-        } else if (isResizing === 'horizontal') {
-            const newTopHeight = ((e.clientY - containerRect.top) / containerRect.height) * 100;
-             if (newTopHeight >= 20 && newTopHeight <= 80) {
-                setRightTopHeight(newTopHeight);
-            }
-        }
-    },
-    [isResizing]
-  );
+    if (isResizing === 'vertical') {
+      const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+      if (newWidth >= 10 && newWidth <= 90) setLeftWidth(newWidth);
+    } else {
+      const newHeight = ((e.clientY - rect.top) / rect.height) * 100;
+      if (newHeight >= 10 && newHeight <= 90) setRightTopHeight(newHeight);
+    }
+  }, [isResizing]);
 
   useEffect(() => {
     if (isResizing) {
-        window.addEventListener('mousemove', resize);
-        window.addEventListener('mouseup', stopResize);
-        document.body.style.cursor = isResizing === 'vertical' ? 'col-resize' : 'row-resize';
-        document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResize);
+      document.body.style.cursor = isResizing === 'vertical' ? 'col-resize' : 'row-resize';
+      document.body.style.userSelect = 'none';
     } else {
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     }
-
     return () => {
-        window.removeEventListener('mousemove', resize);
-        window.removeEventListener('mouseup', stopResize);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResize);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
   }, [isResizing, resize, stopResize]);
 
-
-  // --- HEADER COMPONENT ---
-  const renderHeader = (
+  const renderHeaderUI = (
     panel: PaneType,
     defaultTitle: string,
     isCollapsed: boolean,
     onCollapse: () => void,
     customRender?: (props: any) => React.ReactNode
   ) => {
-     const isMaximized = maximizedPanel === panel;
-     const onMaximize = () => setMaximizedPanel(prev => prev === panel ? 'none' : panel);
-     
-     if (customRender) {
-         return customRender({ isMaximized, isCollapsed, onMaximize, onCollapse });
-     }
+    const isMaximized = maximizedPanel === panel;
+    const onMaximize = () => setMaximizedPanel(prev => prev === panel ? 'none' : panel);
+    
+    // If we are collapsed, we don't show the custom header because it's usually too wide
+    if (customRender && !isCollapsed && maximizedPanel === 'none' || (customRender && isMaximized)) {
+      return customRender({ isMaximized, isCollapsed, onMaximize, onCollapse });
+    }
 
-     // Default Header
-     return (
-        <div className="flex items-center justify-between px-4 h-10 bg-gray-50 border-b border-gray-200 select-none shrink-0">
-          <div className="flex items-center gap-2">
-             <span className="font-bold text-gray-700 text-xs uppercase tracking-wide">{defaultTitle}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button 
-              onClick={onMaximize}
-              className="p-1.5 hover:bg-gray-200 rounded text-gray-500 transition-colors"
-              title={isMaximized ? "Restore" : "Maximize"}
-            >
-              {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-            </button>
-            
-            {(maximizedPanel === 'none') && (
-              <button 
-                onClick={onCollapse}
-                className="p-1.5 hover:bg-gray-200 rounded text-gray-500 transition-colors"
-                title={isCollapsed ? "Expand" : "Collapse"}
-              >
-                 {panel === 'left' && (isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />)}
-                 {panel === 'output' && (isCollapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
-              </button>
-            )}
-          </div>
+    return (
+      <div className="flex items-center justify-between px-4 h-12 bg-white border-b border-gray-100 select-none shrink-0 overflow-hidden">
+        <div className="flex items-center gap-2 max-w-[70%]">
+          <span className="font-bold text-slate-700 text-xs uppercase tracking-widest truncate">{defaultTitle}</span>
         </div>
-     );
+        <div className="flex items-center gap-1 shrink-0">
+          <button 
+            onClick={onMaximize} 
+            className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-all active:scale-95"
+          >
+            {isMaximized ? <WindowRestoreIcon size={16} /> : <WindowMaximizeIcon size={16} />}
+          </button>
+          {maximizedPanel === 'none' && (
+            <button 
+              onClick={onCollapse} 
+              className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-all active:scale-95"
+            >
+              {panel === 'left' && (isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />)}
+              {panel === 'output' && (isCollapsed ? <ChevronUp size={18} /> : <ChevronDown size={18} />)}
+            </button>
+          )}
+        </div>
+      </div>
+    );
   };
 
-  // --- MAXIMIZED VIEW ---
-  // --- ANIMATION VARIANTS ---
-  const isMaximized = maximizedPanel !== 'none';
-  const SMOOTH_TRANSITION = { type: "spring", stiffness: 250, damping: 25 } as const;
+  // Determine widths and heights for animation
+  const getLayoutStyles = () => {
+    if (maximizedPanel === 'left') return { left: '100%', right: '0%', top: '100%', bottom: '0%' };
+    if (maximizedPanel === 'editor') return { left: '0%', right: '100%', top: '100%', bottom: '0%' };
+    if (maximizedPanel === 'output') return { left: '0%', right: '100%', top: '0%', bottom: '100%' };
+    
+    return { 
+      left: isLeftCollapsed ? '48px' : `${leftWidth}%`, 
+      right: isLeftCollapsed ? 'calc(100% - 48px)' : `${100 - leftWidth}%`, 
+      top: isBottomCollapsed ? 'calc(100% - 48px)' : `${rightTopHeight}%`, 
+      bottom: isBottomCollapsed ? '48px' : `${100 - rightTopHeight}%` 
+    };
+  };
 
-  // --- SPLIT LAYOUT ---
+  const styles = getLayoutStyles();
+
   return (
-    <div ref={containerRef} className="flex h-full w-full overflow-hidden bg-gray-100 p-2 gap-2 font-sans">
+    <div ref={containerRef} className="flex h-screen w-full bg-[#f8fafc] overflow-hidden relative">
       
-      {/* LEFT PANEL */}
+      {/* LEFT PANE */}
       <motion.div 
-        layout
+        animate={{ width: styles.left }}
         initial={false}
-        animate={{ 
-          width: maximizedPanel === 'left' ? '100%' : (maximizedPanel !== 'none' ? '0%' : (isLeftCollapsed ? '48px' : `${leftWidth}%`)),
-          opacity: 1
-        }}
-        transition={SMOOTH_TRANSITION}
-        className="flex flex-col bg-white h-full relative z-10 rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+        transition={TRANSITION}
+        className="flex flex-col h-full bg-white relative overflow-hidden shrink-0 border-r border-slate-200/60 z-10"
       >
-        {(!isLeftCollapsed || maximizedPanel === 'left') ? (
-          <>
-            {renderHeader('left', leftTitle, isLeftCollapsed, () => setIsLeftCollapsed(true), renderLeftHeader)}
-            <div className="flex-1 overflow-hidden relative min-h-0 bg-white">{leftContent}</div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center py-4 gap-4 h-full bg-gray-50/50 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setIsLeftCollapsed(false)}>
-             <div className="p-2 rounded-xl bg-white shadow-sm border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 transition-all">
-                <ChevronRight size={18} className="text-gray-400" />
-             </div>
-             <div className="writing-vertical-lr rotate-180 text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap py-4">
-                {leftTitle}
-             </div>
-          </div>
-        )}
+        <div className="flex-1 flex flex-col min-w-[48px] h-full overflow-hidden">
+          {renderHeaderUI('left', leftTitle, isLeftCollapsed, () => setIsLeftCollapsed(!isLeftCollapsed), renderLeftHeader)}
+          <motion.div 
+            animate={{ 
+              opacity: isLeftCollapsed || (maximizedPanel !== 'none' && maximizedPanel !== 'left') ? 0 : 1,
+              x: isLeftCollapsed ? -20 : 0
+            }}
+            transition={{ duration: 0.2 }}
+            className="flex-1 overflow-hidden"
+          >
+            {leftContent}
+          </motion.div>
+          
+          {isLeftCollapsed && maximizedPanel === 'none' && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={() => setIsLeftCollapsed(false)} 
+              className="absolute inset-x-0 bottom-0 top-12 flex flex-col items-center py-6 cursor-pointer hover:bg-slate-50 transition-colors gap-6 group"
+            >
+              <div className="w-1.5 h-32 bg-slate-100 rounded-full group-hover:bg-indigo-100 transition-colors" />
+              <div className="[writing-mode:vertical-lr] text-[10px] font-black text-slate-300 group-hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">Expand {leftTitle}</div>
+            </motion.div>
+          )}
+        </div>
       </motion.div>
 
-      {/* RESIZER VERTICAL (Left <-> Right) */}
-      {!isLeftCollapsed && !isMaximized && (
-          <div
-            className="w-2 hover:w-2 active:w-2 -ml-3 -mr-1 z-20 cursor-col-resize flex items-center justify-center group outline-none"
-            onMouseDown={startVerticalResize}
-          >
-              <div className="h-12 w-1 rounded-full bg-gray-300 group-hover:bg-indigo-400 group-active:bg-indigo-600 transition-colors shadow-sm" />
-          </div>
-      )}
-
-      {/* RIGHT PANEL (Editor + Output) */}
+      {/* VERTICAL RESIZER */}
       <motion.div 
-        layout
-        animate={{
-            width: maximizedPanel === 'left' ? '0%' : (maximizedPanel !== 'none' ? '100%' : `calc(${100 - leftWidth}% - 8px)`) 
+        animate={{ 
+          opacity: maximizedPanel === 'none' && !isLeftCollapsed ? 1 : 0,
+          pointerEvents: maximizedPanel === 'none' && !isLeftCollapsed ? 'auto' : 'none',
+          width: maximizedPanel === 'none' && !isLeftCollapsed ? '4px' : '0px'
         }}
-        transition={SMOOTH_TRANSITION}
-        className="flex-1 flex flex-col h-full min-w-0 bg-transparent gap-2"
-        style={{ overflow: 'hidden' }}
+        onMouseDown={startResize('vertical')}
+        className="bg-transparent hover:bg-indigo-500/10 cursor-col-resize transition-all z-20 shrink-0 flex items-center justify-center group"
       >
-        
-        {/* EDITOR (TOP RIGHT) */}
+        <div className="w-0.5 h-16 bg-slate-200 rounded-full group-hover:bg-indigo-400/50 transition-all group-hover:scale-x-150" />
+      </motion.div>
+
+      {/* RIGHT CONTAINER */}
+      <motion.div 
+        animate={{ width: styles.right }}
+        initial={false}
+        transition={TRANSITION}
+        className="flex flex-col h-full overflow-hidden shrink-0 relative z-10"
+      >
+        {/* TOP PANE (EDITOR) */}
         <motion.div 
-          initial={false}
-          animate={{
-             height: maximizedPanel === 'editor' ? '100%' : (maximizedPanel === 'output' ? '0%' : (isBottomCollapsed ? 'calc(100% - 48px)' : `${rightTopHeight}%`))
+          animate={{ height: styles.top }}
+          transition={TRANSITION}
+          className="flex flex-col bg-white overflow-hidden border-b border-slate-200/60 relative z-10"
+        >
+          <div className="flex-1 flex flex-col min-h-[0px] h-full overflow-hidden">
+             {renderHeaderUI('editor', rightTopTitle, false, () => {}, renderRightTopHeader)}
+             <motion.div 
+               animate={{ opacity: maximizedPanel === 'output' ? 0 : 1 }}
+               transition={{ duration: 0.2 }}
+               className="flex-1 overflow-hidden relative"
+             >
+                {rightTopContent}
+             </motion.div>
+          </div>
+        </motion.div>
+
+        {/* HORIZONTAL RESIZER */}
+        <motion.div 
+          animate={{ 
+            opacity: maximizedPanel === 'none' && !isBottomCollapsed ? 1 : 0,
+            pointerEvents: maximizedPanel === 'none' && !isBottomCollapsed ? 'auto' : 'none',
+            height: maximizedPanel === 'none' && !isBottomCollapsed ? '4px' : '0px'
           }}
-          transition={SMOOTH_TRANSITION}
-          className="flex flex-col bg-white min-h-0 relative z-10 rounded-xl border border-gray-200 shadow-sm overflow-hidden shrink-0"
+          onMouseDown={startResize('horizontal')}
+          className="bg-transparent hover:bg-indigo-500/10 cursor-row-resize transition-all z-20 flex items-center justify-center group"
         >
-           {renderHeader('editor', rightTopTitle, false, () => {}, renderRightTopHeader)}
-           <div className="flex-1 relative overflow-hidden h-full bg-white flex flex-col">{rightTopContent}</div>
+          <div className="h-0.5 w-32 bg-slate-200 rounded-full group-hover:bg-indigo-400/50 transition-all group-hover:scale-y-150" />
         </motion.div>
 
-         {/* RESIZER HORIZONTAL (Editor <-> Output) */}
-         {!isBottomCollapsed && !isMaximized && (
-            <div 
-                className="h-2 hover:h-2 active:h-2 -mt-3 -mb-1 z-20 cursor-row-resize flex items-center justify-center group outline-none"
-                onMouseDown={startHorizontalResize}
-            >
-                <div className="w-12 h-1 rounded-full bg-gray-300 group-hover:bg-indigo-400 group-active:bg-indigo-600 transition-colors shadow-sm" />
-            </div>
-         )}
-
-        {/* OUTPUT (BOTTOM RIGHT) */}
+        {/* BOTTOM PANE (OUTPUT) */}
         <motion.div 
-           initial={false}
-           animate={{ 
-             height: maximizedPanel === 'output' ? '100%' : (maximizedPanel === 'editor' ? '0px' : (isBottomCollapsed ? '48px' : `calc(${100 - rightTopHeight}% - 8px)`))
-           }}
-           transition={SMOOTH_TRANSITION}
-           className={`bg-white flex flex-col overflow-hidden relative z-0 rounded-xl border border-gray-200 shadow-sm shrink-0 ${isBottomCollapsed && maximizedPanel !== 'output' ? 'h-[48px]' : ''}`}
+          animate={{ height: styles.bottom }}
+          transition={TRANSITION}
+          className="flex flex-col bg-white overflow-hidden shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)] relative z-10"
         >
-           {(!isBottomCollapsed || maximizedPanel === 'output') ? (
-             <>
-               {renderHeader('output', rightBottomTitle, isBottomCollapsed, () => setIsBottomCollapsed(true), renderRightBottomHeader)}
-               <div className="flex-1 overflow-hidden relative h-full bg-white flex flex-col">{rightBottomContent}</div>
-             </>
-           ) : (
-              <div className="flex items-center justify-between px-4 h-full bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => setIsBottomCollapsed(false)}>
-                 <div className="flex items-center gap-3">
-                     <div className="p-1.5 rounded-lg bg-white border border-gray-200 shadow-sm">
-                        <Terminal size={16} className="text-gray-500" />
-                     </div>
-                     <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{rightBottomTitle}</span>
-                 </div>
-                 <ChevronUp size={18} className="text-gray-400" />
-              </div>
-           )}
+          <div className="flex-1 flex flex-col min-h-[48px] h-full overflow-hidden">
+            {renderHeaderUI('output', rightBottomTitle, isBottomCollapsed, () => setIsBottomCollapsed(!isBottomCollapsed), renderRightBottomHeader)}
+            <motion.div 
+              animate={{ 
+                opacity: isBottomCollapsed || maximizedPanel === 'editor' ? 0 : 1,
+                y: isBottomCollapsed ? 20 : 0
+              }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 overflow-hidden"
+            >
+              {rightBottomContent}
+            </motion.div>
+            
+            {isBottomCollapsed && maximizedPanel === 'none' && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                onClick={() => setIsBottomCollapsed(false)} 
+                className="absolute inset-0 top-12 flex items-center px-8 cursor-pointer hover:bg-slate-50 transition-colors gap-8 group"
+              >
+                <div className="flex-1 h-1.5 bg-slate-100 rounded-full group-hover:bg-indigo-100 transition-colors" />
+                <div className="text-[10px] font-black text-slate-300 group-hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">Expand {rightBottomTitle}</div>
+                <div className="flex-1 h-1.5 bg-slate-100 rounded-full group-hover:bg-indigo-100 transition-colors" />
+              </motion.div>
+            )}
+          </div>
         </motion.div>
-
       </motion.div>
     </div>
   );
 }
-

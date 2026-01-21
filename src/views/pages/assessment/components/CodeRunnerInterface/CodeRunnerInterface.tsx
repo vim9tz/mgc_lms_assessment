@@ -45,11 +45,13 @@ import {
   KeyboardDoubleArrowLeft,
   Description,
   Visibility,
-  ExitToApp as LogoutIcon 
+  ExitToApp as LogoutIcon, 
+  NetworkCheck,
+  SlowMotionVideo
 } from "@mui/icons-material";
 import { useRouter } from 'next/navigation';
 import { 
-    Maximize2, Minimize2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, 
+    ChevronLeft, ChevronRight, ChevronUp, ChevronDown, 
     LogOut, Play, Code2, Terminal, List as LucideList, X, Loader2, CheckCircle2, XCircle, Eye,
     Save, FileX, RefreshCw
 } from 'lucide-react';
@@ -126,7 +128,7 @@ interface SubmissionResult {
 import { Accordion, AccordionSummary, AccordionDetails } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PythonVisualizer from "./PythonVisualizer";
-import ThreePaneLayout from "../ThreePaneLayout";
+import ThreePaneLayout, { WindowMaximizeIcon, WindowRestoreIcon } from "../ThreePaneLayout";
 import AssessmentLoading from "../AssessmentLoading";
 
 const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
@@ -564,7 +566,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                          sx={{ 
                              color: 'text.secondary', 
                              textTransform: 'none', 
-                             fontSize: '0.85rem',
+                             fontSize: '0.85rem', 
                              minWidth: 'auto',
                              px: 1,
                              '&:hover': { bgcolor: 'grey.50', color: 'text.primary' } 
@@ -626,7 +628,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
                         <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
                             <IconButton onClick={onMaximize} size="small">
-                                {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                                {isMaximized ? <WindowRestoreIcon size={16} /> : <WindowMaximizeIcon size={16} />}
                             </IconButton>
                         </Tooltip>
                         {!isMaximized && (
@@ -837,6 +839,15 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
              </div>
 
              <div className="flex items-center gap-3">
+                 
+                  <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
+                    <IconButton onClick={onMaximize} size="small" sx={{color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' }}}>
+                        {isMaximized ? <WindowRestoreIcon size={16} /> : <WindowMaximizeIcon size={16} />}
+                    </IconButton>
+                 </Tooltip>
+
+                 <div className="w-px h-5 bg-gray-100 mx-1" />
+
                  {/* Action Group */}
                  <div className="flex items-center p-1 rounded-xl bg-gray-50 border border-gray-100">
                          <Button
@@ -951,13 +962,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     Submit
                  </Button>
                  
-                 <div className="w-px h-5 bg-gray-100 mx-1" />
-                 
-                 <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
-                    <IconButton onClick={onMaximize} size="small" sx={{color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' }}}>
-                        {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                    </IconButton>
-                 </Tooltip>
+                
              </div>
         </div>
   );
@@ -1011,7 +1016,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
             <div className="flex items-center gap-1">
                  <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
                     <IconButton onClick={onMaximize} size="small" sx={{color: 'text.secondary'}}>
-                        {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                        {isMaximized ? <WindowRestoreIcon size={16} /> : <WindowMaximizeIcon size={16} />}
                     </IconButton>
                  </Tooltip>
                  {!isMaximized && (
