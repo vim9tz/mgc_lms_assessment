@@ -85,3 +85,33 @@ export const useCodeRunner = (questionId?: string, token?: string) => {
         submitCode
     };
 };
+
+export const useSubmitCode = () => {
+    const [isPending, setIsPending] = useState(false);
+
+    const mutateAsync = async (payload: any) => {
+        setIsPending(true);
+        try {
+            return await codeRunnerApi.submitCode(payload);
+        } finally {
+            setIsPending(false);
+        }
+    };
+
+    return { mutateAsync, isPending };
+};
+
+export const useSaveCode = () => {
+    const [isPending, setIsPending] = useState(false);
+
+    const mutateAsync = async (payload: any) => {
+        setIsPending(true);
+        try {
+            return await codeRunnerApi.saveCode(payload);
+        } finally {
+            setIsPending(false);
+        }
+    };
+
+    return { mutateAsync, isPending };
+};

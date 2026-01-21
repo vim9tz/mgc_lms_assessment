@@ -10,7 +10,8 @@ import {
   ChevronDown, 
   ChevronUp,
   GripVertical,
-  GripHorizontal
+  GripHorizontal,
+  Terminal
 } from 'lucide-react';
 
 export type PaneType = 'none' | 'left' | 'editor' | 'output';
@@ -161,31 +162,30 @@ export default function ThreePaneLayout({
 
   // --- SPLIT LAYOUT ---
   return (
-    <div ref={containerRef} className="flex h-full w-full overflow-hidden bg-white font-sans">
+    <div ref={containerRef} className="flex h-full w-full overflow-hidden bg-gray-100 p-2 gap-2 font-sans">
       
       {/* LEFT PANEL */}
       <motion.div 
         layout
         initial={false}
         animate={{ 
-          width: maximizedPanel === 'left' ? '100%' : (maximizedPanel !== 'none' ? '0%' : (isLeftCollapsed ? '40px' : `${leftWidth}%`)),
+          width: maximizedPanel === 'left' ? '100%' : (maximizedPanel !== 'none' ? '0%' : (isLeftCollapsed ? '48px' : `${leftWidth}%`)),
           opacity: 1
         }}
         transition={SMOOTH_TRANSITION}
-        className="flex flex-col bg-white h-full relative z-10 border-r border-gray-200"
-        style={{ overflow: 'hidden' }}
+        className="flex flex-col bg-white h-full relative z-10 rounded-xl border border-gray-200 shadow-sm overflow-hidden"
       >
         {(!isLeftCollapsed || maximizedPanel === 'left') ? (
           <>
             {renderHeader('left', leftTitle, isLeftCollapsed, () => setIsLeftCollapsed(true), renderLeftHeader)}
-            <div className="flex-1 overflow-hidden relative min-h-0">{leftContent}</div>
+            <div className="flex-1 overflow-hidden relative min-h-0 bg-white">{leftContent}</div>
           </>
         ) : (
-          <div className="flex flex-col items-center py-4 gap-4 h-full bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setIsLeftCollapsed(false)}>
-             <div className="p-2 rounded-md hover:bg-white hover:shadow-sm transition-all">
-                <ChevronRight size={20} className="text-gray-400" />
+          <div className="flex flex-col items-center py-4 gap-4 h-full bg-gray-50/50 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setIsLeftCollapsed(false)}>
+             <div className="p-2 rounded-xl bg-white shadow-sm border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 transition-all">
+                <ChevronRight size={18} className="text-gray-400" />
              </div>
-             <div className="writing-vertical-lr rotate-180 text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+             <div className="writing-vertical-lr rotate-180 text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap py-4">
                 {leftTitle}
              </div>
           </div>
@@ -195,10 +195,10 @@ export default function ThreePaneLayout({
       {/* RESIZER VERTICAL (Left <-> Right) */}
       {!isLeftCollapsed && !isMaximized && (
           <div
-            className="w-1.5 hover:w-2 active:w-2 cursor-col-resize z-20 flex items-center justify-center hover:bg-blue-400/20 transition-all -ml-[3px]"
+            className="w-2 hover:w-2 active:w-2 -ml-3 -mr-1 z-20 cursor-col-resize flex items-center justify-center group outline-none"
             onMouseDown={startVerticalResize}
           >
-              <div className="h-8 w-1 rounded-full bg-gray-200" />
+              <div className="h-12 w-1 rounded-full bg-gray-300 group-hover:bg-indigo-400 group-active:bg-indigo-600 transition-colors shadow-sm" />
           </div>
       )}
 
@@ -206,10 +206,10 @@ export default function ThreePaneLayout({
       <motion.div 
         layout
         animate={{
-            width: maximizedPanel === 'left' ? '0%' : (maximizedPanel !== 'none' ? '100%' : `${100 - leftWidth}%`)
+            width: maximizedPanel === 'left' ? '0%' : (maximizedPanel !== 'none' ? '100%' : `calc(${100 - leftWidth}% - 8px)`) 
         }}
         transition={SMOOTH_TRANSITION}
-        className="flex-1 flex flex-col h-full min-w-0 bg-white"
+        className="flex-1 flex flex-col h-full min-w-0 bg-transparent gap-2"
         style={{ overflow: 'hidden' }}
       >
         
@@ -218,23 +218,22 @@ export default function ThreePaneLayout({
           layout
           initial={false}
           animate={{
-             height: maximizedPanel === 'editor' ? '100%' : (maximizedPanel === 'output' ? '0%' : (isBottomCollapsed ? 'calc(100% - 40px)' : `${rightTopHeight}%`))
+             height: maximizedPanel === 'editor' ? '100%' : (maximizedPanel === 'output' ? '0%' : (isBottomCollapsed ? 'calc(100% - 48px)' : `${rightTopHeight}%`))
           }}
           transition={SMOOTH_TRANSITION}
-          className="flex flex-col bg-white min-h-0 relative z-10"
-          style={{ overflow: 'hidden' }}
+          className="flex flex-col bg-white min-h-0 relative z-10 rounded-xl border border-gray-200 shadow-sm overflow-hidden"
         >
            {renderHeader('editor', rightTopTitle, false, () => {}, renderRightTopHeader)}
-           <div className="flex-1 relative overflow-hidden h-full">{rightTopContent}</div>
+           <div className="flex-1 relative overflow-hidden h-full bg-white">{rightTopContent}</div>
         </motion.div>
 
          {/* RESIZER HORIZONTAL (Editor <-> Output) */}
          {!isBottomCollapsed && !isMaximized && (
             <div 
-                className="h-1.5 hover:h-2 active:h-2 cursor-row-resize z-20 flex items-center justify-center hover:bg-blue-400/20 transition-all -mt-[3px]"
+                className="h-2 hover:h-2 active:h-2 -mt-3 -mb-1 z-20 cursor-row-resize flex items-center justify-center group outline-none"
                 onMouseDown={startHorizontalResize}
             >
-                <div className="w-8 h-1 rounded-full bg-gray-200" />
+                <div className="w-12 h-1 rounded-full bg-gray-300 group-hover:bg-indigo-400 group-active:bg-indigo-600 transition-colors shadow-sm" />
             </div>
          )}
 
@@ -247,17 +246,22 @@ export default function ThreePaneLayout({
              height: (maximizedPanel === 'editor') ? '0px' : 'auto'
            }}
            transition={SMOOTH_TRANSITION}
-           className={`bg-white flex flex-col overflow-hidden relative z-0 border-t border-gray-200 ${isBottomCollapsed && maximizedPanel !== 'output' ? 'h-[40px]' : ''}`}
+           className={`bg-white flex flex-col overflow-hidden relative z-0 rounded-xl border border-gray-200 shadow-sm ${isBottomCollapsed && maximizedPanel !== 'output' ? 'h-[48px]' : ''}`}
         >
            {(!isBottomCollapsed || maximizedPanel === 'output') ? (
              <>
                {renderHeader('output', rightBottomTitle, isBottomCollapsed, () => setIsBottomCollapsed(true), renderRightBottomHeader)}
-               <div className="flex-1 overflow-hidden relative h-full">{rightBottomContent}</div>
+               <div className="flex-1 overflow-hidden relative h-full bg-white">{rightBottomContent}</div>
              </>
            ) : (
-              <div className="flex items-center justify-between px-4 h-10 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setIsBottomCollapsed(false)}>
-                 <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{rightBottomTitle}</span>
-                 <ChevronUp size={16} className="text-gray-400" />
+              <div className="flex items-center justify-between px-4 h-full bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => setIsBottomCollapsed(false)}>
+                 <div className="flex items-center gap-3">
+                     <div className="p-1.5 rounded-lg bg-white border border-gray-200 shadow-sm">
+                        <Terminal size={16} className="text-gray-500" />
+                     </div>
+                     <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{rightBottomTitle}</span>
+                 </div>
+                 <ChevronUp size={18} className="text-gray-400" />
               </div>
            )}
         </motion.div>

@@ -435,7 +435,31 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
     generateTrace();
   }, [pyodide, code, stdIn]);
 
-  if (loading) return <Box p={4} textAlign="center"><CircularProgress size={30} /><Typography sx={{mt:2}}>{initStatus}</Typography></Box>;
+  if (loading) return (
+    <Box 
+      height="100%" 
+      display="flex" 
+      flexDirection="column" 
+      alignItems="center" 
+      justifyContent="center" 
+      bgcolor="#0f172a" 
+      color="white"
+      gap={3}
+    >
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-xl animate-pulse" />
+        <CircularProgress size={50} thickness={4} sx={{ color: '#38bdf8', position: 'relative' }} />
+      </div>
+      <Box textAlign="center">
+        <Typography variant="h6" fontWeight={600} sx={{ color: '#e2e8f0', mb: 1 }}>
+          Initializing Python Engine
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+          {initStatus}
+        </Typography>
+      </Box>
+    </Box>
+  );
   if (error) return <Alert severity="error">{error}</Alert>;
 
   const currentData = trace[currentStep] || {};
@@ -605,15 +629,41 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
 
                 {/* STANDARD INPUT DRAWER */}
                 {showInput && (
-                    <Box p={2} borderTop="1px solid rgba(255,255,255,0.1)" bgcolor="#1e293b">
-                        <Typography variant="caption" color="gray" sx={{ mb: 1, display: 'block', letterSpacing: 1 }}>STANDARD INPUT (Stdin)</Typography>
+                    <Box 
+                        p={2} 
+                        borderTop="1px solid rgba(255,255,255,0.1)" 
+                        bgcolor={waitingForInput ? "rgba(234, 179, 8, 0.1)" : "#1e293b"} // Amber tint when waiting
+                        position="relative"
+                    >
+                         <Box display="flex" justifyContent="space-between" mb={1}>
+                            <Typography variant="caption" color={waitingForInput ? "#facc15" : "gray"} sx={{ display: 'block', letterSpacing: 1, fontWeight: 700 }}>
+                                {waitingForInput ? "⚠️ WAITING FOR USER INPUT (Type below)" : "STANDARD INPUT (Stdin)"}
+                            </Typography>
+                            {waitingForInput && (
+                                <Typography variant="caption" sx={{ color: '#facc15',  animation: 'pulse 2s infinite' }}>
+                                    Program paused at input()
+                                </Typography>
+                            )}
+                        </Box>
+
                         <textarea 
+                            ref={(input) => {
+                                // Auto-focus if waiting and input is mounted
+                                if (input && waitingForInput) {
+                                    // Prevent fighting with user focus if they are already typing?
+                                    // Only focus if not already focused?
+                                    if (document.activeElement !== input) {
+                                        input.focus(); 
+                                    }
+                                }
+                            }}
                             value={stdIn} 
                             onChange={(e) => handleInputChange(e.target.value)} 
-                            className="w-full bg-slate-900 text-gray-300 p-2 rounded border border-slate-700 font-mono text-sm outline-none focus:border-blue-500"
-                            placeholder="Enter input for input() calls here..."
+                            className={`w-full bg-slate-900 text-gray-300 p-2 rounded border font-mono text-sm outline-none transition-colors ${waitingForInput ? 'border-amber-500 ring-1 ring-amber-500/50' : 'border-slate-700 focus:border-blue-500'}`}
+                            placeholder="Type input here (lines are read sequentially)..."
                             rows={3}
                         />
+                         <style>{`@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }`}</style>
                     </Box>
                 )}
 

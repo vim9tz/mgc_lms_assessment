@@ -3,7 +3,9 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { signOut } from "next-auth/react";
-import { useCodeRunner } from "@/domains/code-runner/hooks/useCodeRunner";
+import { useCodeRunner, useSaveCode, useSubmitCode } from "@/domains/code-runner/hooks/useCodeRunner";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import {
   Button,
   Card,
@@ -42,9 +44,15 @@ import {
   KeyboardDoubleArrowRight,
   KeyboardDoubleArrowLeft,
   Description,
-  Visibility
+  Visibility,
+  ExitToApp as LogoutIcon 
 } from "@mui/icons-material";
-import { Maximize2, Minimize2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { 
+    Maximize2, Minimize2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, 
+    LogOut, Play, Code2, Terminal, List as LucideList, X, Loader2, CheckCircle2, XCircle, Eye,
+    Save, FileX
+} from 'lucide-react';
 
 // Monaco editor (client-only)
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -138,6 +146,27 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmissionResult | null>(null);
 
+  // Exit & Submit Confirmation State
+  const router = useRouter();
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  const handleExit = () => {
+      setExitDialogOpen(true);
+  };
+
+  const confirmExit = () => {
+      setExitDialogOpen(false);
+      router.back();
+      setTimeout(() => router.back(), 100);
+  };
+
+  const handleConfirmSubmit = () => {
+      setSubmitDialogOpen(false);
+      handleCodeSubmit();
+  };
+
   // Visualizer State
   const [showVisualizer, setShowVisualizer] = useState(false);
 
@@ -166,8 +195,10 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
       loadingTopicQuestions, 
       submitting: hookSubmitting,
       fetchTopicQuestions,
-      submitCode
   } = useCodeRunner(currentQuestionId, token);
+
+  const { mutateAsync: submitCode } = useSubmitCode();
+  const { mutateAsync: saveCode, isPending: isSaving } = useSaveCode();
 
   // Sync hook state to local state if needed, or replace usage dependent on UI
   // The hook handles fetching active question and topic questions.
@@ -219,6 +250,49 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         }
     }
   }, [topicQuestions, currentQuestionId]);
+
+
+
+  // Handle Save Draft
+  // Handle Save Draft
+  const handleSaveDraft = async () => {
+      try {
+          if (!question) return;
+          
+          await saveCode({
+              question_id: question.id,
+              code: code,
+              language_id: question.programming_language_id || 1
+          });
+          
+          setSaveDialogOpen(false);
+          toast.success("Draft saved successfully!");
+      } catch (error) {
+          console.error("Save failed:", error);
+          toast.error("Failed to save draft.");
+      }
+  };
+
+  // Handle Save & Exit
+  const handleSaveAndExit = async () => {
+      try {
+          if (!question) return;
+
+          await saveCode({
+              question_id: question.id,
+              code: code,
+              language_id: question.programming_language_id || 1
+          });
+          
+          setSaveDialogOpen(false);
+          toast.success("Progress saved. Exiting...");
+          confirmExit(); // Reuse existing exit logic
+          
+      } catch (error) {
+          console.error("Save & Exit failed:", error);
+          toast.error("Failed to save and exit.");
+      }
+  };
 
 
   const handleCodeSubmit = async () => {
@@ -303,10 +377,12 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         }
         
         setActiveTab(1); // Switch to results
+        toast.success("Solution submitted successfully!");
 
       } catch (e: any) {
           console.error(e);
           setResult({ status: "error", output: e.message || "Submission failed. Please try again." });
+          toast.error("Submission failed. Please try again.");
       } finally {
           setSubmitting(false);
       }
@@ -423,7 +499,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
              <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
                        <Button 
-                         startIcon={<ListIcon />} 
+                         startIcon={<LucideList size={18} />} 
                          variant="text" 
                          size="small"
                          onClick={() => setDrawerOpen(true)}
@@ -447,7 +523,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                 onClick={() => prevQuestionId && handleSwitchQuestion(prevQuestionId)}
                                 size="small"
                                 >
-                                <NavigateBefore fontSize="small" />
+                                <ChevronLeft size={18} />
                                 </IconButton>
                             </span>
                         </Tooltip>
@@ -458,14 +534,38 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                     onClick={() => nextQuestionId && handleSwitchQuestion(nextQuestionId)}
                                     size="small"
                                 >
-                                    <NavigateNext fontSize="small" />
+                                    <ChevronRight size={18} />
                                 </IconButton>
                             </span>
                         </Tooltip>
                       </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
+                         {/* EXIT BUTTON */}
+                         <Button
+                            onClick={handleExit}
+                            variant="outlined"
+                            color="inherit"
+                            size="small"
+                            startIcon={<LogOut size={16} />}
+                            sx={{ 
+                                textTransform: 'none', 
+                                fontWeight: 600, 
+                                borderRadius: '8px', 
+                                color: 'text.secondary', 
+                                borderColor: 'divider',
+                                fontSize: '0.8rem',
+                                height: 32,
+                                minWidth: 80,
+                                '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.300', color: 'error.main' } 
+                            }}
+                         >
+                            Exit
+                         </Button>
+
+                         <div className="w-px h-6 bg-gray-200 mx-1" />
+
                         <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
                             <IconButton onClick={onMaximize} size="small">
                                 {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -513,28 +613,30 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                  )}
              </div>
 
-             {/* Modern Tabs aligned to bottom like old UI */}
-             <div className="-mb-[1px]">
-                 <Tabs 
-                    value={leftTab} 
-                    onChange={(_, v) => setLeftTab(v)} 
-                    aria-label="Problem Tabs"
-                    sx={{ minHeight: 40 }}
-                    TabIndicatorProps={{ sx: { height: 2, borderRadius: '2px 2px 0 0' } }}
-                 >
-                     <Tab label="Description" sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40, py: 1, fontSize: '0.9rem' }} />
-                     {question.constraints && (
-                         <Tab label="Constraints" sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40, py: 1, fontSize: '0.9rem' }} />
-                     )}
-                 </Tabs>
+             {/* Modern Tabs (Segmented Control - Squared) */}
+             <div className="bg-gray-100/80 p-1 rounded-lg flex gap-1 mb-2 self-start">
+                <button
+                    onClick={() => setLeftTab(0)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${leftTab === 0 ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    Description
+                </button>
+                {question.constraints && (
+                    <button
+                        onClick={() => setLeftTab(1)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${leftTab === 1 ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Constraints
+                    </button>
+                )}
              </div>
       </div>
   );
 
   const LeftContent = (
-      <div className="h-full overflow-y-auto p-6 pt-4 no-scrollbar">
+      <div className="h-full overflow-y-auto p-6 pt-6 no-scrollbar bg-white">
              {leftTab === 0 && (
-                <div className="animate-in fade-in duration-300 question-content-wrapper">
+                <div className="animate-in slide-in-from-bottom-2 fade-in duration-500 question-content-wrapper">
                     <style jsx global>{`
                         .no-scrollbar::-webkit-scrollbar {
                             display: none;
@@ -549,78 +651,93 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                             width: 100%;
                             overflow-wrap: break-word;
                             word-wrap: break-word;
-                            word-break: break-word;
-                            hyphens: auto;
+                            word-break: normal;
+                            hyphens: manual;
                         }
                         .question-content-wrapper * {
                             max-width: 100% !important;
                             overflow-wrap: break-word !important; 
-                            white-space: normal !important; /* Force wrapping for everything unless specifically pre */
+                            white-space: normal !important; 
                         }
 
-                        /* Exception for pre/code blocks which we want to wrap BUT respect newlines if any */
                         .question-content-wrapper pre,
                         .question-content-wrapper code,
                         .question-content-wrapper pre code {
                             white-space: pre-wrap !important;
-                            word-break: break-all !important; /* Stronger break for code tokens */
+                            word-break: break-word !important;
                         }
 
-                        .question-content-wrapper img { max-width: 100%; height: auto; }
+                        .question-content-wrapper img { max-width: 100%; height: auto; border-radius: 8px; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
                         
-                        /* Specific overrides for pre styling */
                         .question-content-wrapper pre { 
-                            overflow-x: hidden; /* Hide horizontal scroll if we are forcing wrap */
+                            overflow-x: hidden;
                             background-color: #f8fafc;
-                            padding: 0.75rem;
-                            border-radius: 0.5rem;
+                            padding: 1rem;
+                            border-radius: 0.75rem;
                             border: 1px solid #e2e8f0;
+                            font-size: 0.9em;
+                            color: #334155;
                         }
-                        .question-content-wrapper table { display: block; overflow-x: auto; max-width: 100%; }
+                        .question-content-wrapper table { display: block; overflow-x: auto; max-width: 100%; border-collapse: collapse; width: 100%; margin: 1rem 0; }
+                        .question-content-wrapper th, .question-content-wrapper td { border: 1px solid #e2e8f0; padding: 0.5rem 1rem; }
+                        .question-content-wrapper th { background: #f1f5f9; font-weight: 600; text-align: left; }
                     `}</style>
 
-                    <div
-                      className="prose prose-sm md:prose-base max-w-none text-slate-700 leading-relaxed font-normal question-content-wrapper"
-                      dangerouslySetInnerHTML={{ __html: question.content }}
-                    />
-                    
-                    {/* Complexity Requirements */}
+                    {/* Complexity Badges - Moved to Top for visibility */}
                     {(question.expected_time_complexity || question.expected_space_complexity) && (
-                        <div className="flex flex-wrap gap-3 mt-8">
+                        <div className="flex flex-wrap gap-2 mb-6">
                             {question.expected_time_complexity && (
-                                <div className="flex flex-col bg-slate-50 border border-slate-100 px-4 py-2 rounded-xl">
-                                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Time Complexity</span>
-                                    <span className="font-mono font-bold text-slate-700">{question.expected_time_complexity}</span>
+                                <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100/50 shadow-sm transition-hover hover:bg-blue-100/50">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Time</span>
+                                    <span className="font-mono text-xs font-bold">{question.expected_time_complexity}</span>
                                 </div>
                             )}
                             {question.expected_space_complexity && (
-                                <div className="flex flex-col bg-slate-50 border border-slate-100 px-4 py-2 rounded-xl">
-                                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Space Complexity</span>
-                                    <span className="font-mono font-bold text-slate-700">{question.expected_space_complexity}</span>
+                                <div className="flex items-center gap-2 bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-100/50 shadow-sm transition-hover hover:bg-purple-100/50">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Space</span>
+                                    <span className="font-mono text-xs font-bold">{question.expected_space_complexity}</span>
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Example Cases */}
+                    <div
+                      className="prose prose-slate max-w-none text-slate-600 leading-relaxed font-normal question-content-wrapper prose-headings:text-slate-800 prose-headings:font-bold prose-p:mb-4 prose-code:text-pink-600 prose-code:bg-pink-50 prose-code:px-1 prose-code:rounded prose-code:font-semibold prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-100"
+                      dangerouslySetInnerHTML={{ __html: question.content }}
+                    />
+
+                    {/* Example Cases - Modernized */}
                     {question.test_cases && question.test_cases.filter((tc: any) => tc.is_public).length > 0 && (
-                        <div className="mt-8 space-y-4">
-                             <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Examples</div>
+                        <div className="mt-8 space-y-5">
+                             <div className="flex items-center gap-2">
+                                <span className="h-px bg-slate-200 flex-1"></span>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2">Examples</span>
+                                <span className="h-px bg-slate-200 flex-1"></span>
+                             </div>
                              
                              {question.test_cases.filter((tc: any) => tc.is_public).map((tc: any, i: number) => (
-                                 <div key={i} className="bg-gray-50/50 rounded-xl border border-gray-100 overflow-hidden">
-                                     <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                                         <span className="text-xs font-bold text-slate-700">Example {i + 1}</span>
-                                         {tc.description && <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-gray-200">{tc.description}</span>}
+                                 <div key={i} className="group bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md hover:border-indigo-200 transition-all duration-300">
+                                     <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center group-hover:bg-indigo-50/30 transition-colors">
+                                         <div className="flex items-center gap-2">
+                                             <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-400"></div>
+                                             <span className="text-xs font-bold text-slate-600 group-hover:text-indigo-700">Example {i + 1}</span>
+                                         </div>
+                                         {tc.description && <span className="text-[10px] text-slate-500 font-medium">{tc.description}</span>}
                                      </div>
-                                     <div className="p-4 grid gap-3">
+                                     <div className="p-4 grid gap-4 bg-white">
                                          <div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Input</div>
-                                            <code className="block bg-white border border-gray-200 rounded-lg p-2 font-mono text-sm text-slate-700 overflow-x-auto whitespace-pre">{tc.input_data}</code>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                                                <span className="w-1 h-3 bg-slate-200 rounded-sm"></span>
+                                                Input
+                                            </div>
+                                            <code className="block bg-slate-50 border border-slate-100 text-slate-700 rounded-lg p-3 font-mono text-sm overflow-x-auto whitespace-pre leading-relaxed group-hover:border-indigo-100 transition-colors">{tc.input_data}</code>
                                          </div>
                                          <div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Output</div>
-                                            <code className="block bg-white border border-gray-200 rounded-lg p-2 font-mono text-sm text-slate-700 overflow-x-auto whitespace-pre">{tc.expected_output}</code>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                                                <span className="w-1 h-3 bg-indigo-200 rounded-sm"></span>
+                                                Output
+                                            </div>
+                                            <code className="block bg-indigo-50/30 border border-indigo-100/50 text-indigo-900 rounded-lg p-3 font-mono text-sm overflow-x-auto whitespace-pre leading-relaxed">{tc.expected_output}</code>
                                          </div>
                                      </div>
                                  </div>
@@ -631,89 +748,128 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
              )}
 
              {leftTab === 1 && question.constraints && (
-                <div className="animate-in fade-in duration-300">
-                    <div className="bg-amber-50 rounded-xl border border-amber-100 p-5 text-amber-900/80 text-sm leading-relaxed" 
-                         dangerouslySetInnerHTML={{ __html: question.constraints }} 
-                    />
+                <div className="animate-in slide-in-from-bottom-2 fade-in duration-500">
+                    <div className="bg-amber-50/50 rounded-xl border border-amber-100 p-5 shadow-sm">
+                        <div className="flex items-center gap-3 mb-3 text-amber-800">
+                             <div className="p-1.5 bg-amber-100 rounded-lg">
+                                <ErrorIcon sx={{ fontSize: 18, color: '#d97706' }} />
+                             </div>
+                             <h4 className="font-bold text-sm">Constraints & Limitations</h4>
+                        </div>
+                        <div 
+                            className="text-amber-900/80 text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-ul:my-2"
+                            dangerouslySetInnerHTML={{ __html: question.constraints }} 
+                        />
+                    </div>
                 </div>
-            )}
+             )}
       </div>
   );
   
   const renderRightTopHeader = ({ isMaximized, onMaximize }: any) => (
-        <div className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 shrink-0 z-20">
+        <div className="h-14 bg-white flex items-center justify-between px-4 shrink-0 z-20">
              <div className="flex items-center gap-3">
-                 <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600">
-                     <CodeIcon fontSize="small" />
-                 </span>
+                 <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                     <Code2 size={16} strokeWidth={2.5} />
+                 </div>
                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-800 leading-none">{question.programming_language || "Code"}</span>
-                    <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mt-0.5">Editor</span>
+                    <span className="text-sm font-bold text-slate-800 leading-none tracking-tight">{question.programming_language || "Code"}</span>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Editor</span>
                  </div>
              </div>
 
-             <div className="flex items-center gap-2">
-                 <Button
-                    variant="outlined"
-                    color="inherit"
-                    size="small"
-                    disabled={submitting}
-                    onClick={handleCodeRun}
-                    startIcon={submitting ? <CircularProgress size={14} color="inherit" /> : <PlayArrow sx={{ fontSize: 18 }} />}
-                    sx={{ 
-                        textTransform: 'none', 
-                        fontWeight: 600, 
-                        borderRadius: '8px', 
-                        color: 'text.secondary', 
-                        borderColor: 'divider',
-                        fontSize: '0.85rem',
-                        '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } 
-                    }}
-                 >
-                    Run
-                 </Button>
+             <div className="flex items-center gap-3">
+                 {/* Action Group */}
+                 <div className="flex items-center p-1 rounded-xl bg-gray-50 border border-gray-100">
                      <Button
-                        variant="outlined"
-                        color="inherit"
+                        variant="text"
                         size="small"
-                        onClick={() => setShowVisualizer(true)}
-                        startIcon={<Visibility sx={{ fontSize: 18 }} />}
+                        disabled={submitting}
+                        onClick={handleCodeRun}
+                        startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Play size={15} className="fill-current" />}
                         sx={{ 
                             textTransform: 'none', 
                             fontWeight: 600, 
                             borderRadius: '8px', 
                             color: 'text.secondary', 
-                            borderColor: 'divider',
-                            fontSize: '0.85rem',
-                            '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } 
+                            minWidth: 'auto',
+                            px: 2,
+                            fontSize: '0.8rem',
+                            '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' } 
+                        }}
+                     >
+                        Run
+                     </Button>
+                     <div className="w-px h-4 bg-gray-200" />
+                     <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => setShowVisualizer(true)}
+                        startIcon={<Eye size={15} />}
+                        sx={{ 
+                            textTransform: 'none', 
+                            fontWeight: 600, 
+                            borderRadius: '8px', 
+                            color: 'text.secondary', 
+                            minWidth: 'auto',
+                            px: 2,
+                            fontSize: '0.8rem',
+                            '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' } 
                         }}
                      >
                         Visualizer
                      </Button>
+                 </div>
+
+
+                 <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={submitting}
+                    onClick={() => setSaveDialogOpen(true)}
+                    startIcon={isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={16} />}
+                    sx={{ 
+                        textTransform: 'none', 
+                        fontWeight: 600, 
+                        borderRadius: '10px', 
+                        fontSize: '0.85rem',
+                        px: 2,
+                        py: 0.8,
+                        mr: 1.5,
+                        borderColor: '#e0e7ff',
+                        color: '#4f46e5',
+                        '&:hover': { bgcolor: '#eef2ff', borderColor: '#c7d2fe' }
+                    }}
+                 >
+                    Save
+                 </Button>
+
                  <Button
                     variant="contained"
                     color="primary"
                     size="small"
                     disabled={submitting}
-                    onClick={handleCodeSubmit}
-                    startIcon={submitting ? <CircularProgress size={14} color="inherit" /> : <CloudUploadIcon sx={{ fontSize: 18 }} />}
+                    onClick={() => setSubmitDialogOpen(true)}
+                    startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <CloudUploadIcon sx={{ fontSize: 18 }} />}
                     sx={{ 
                         textTransform: 'none', 
-                        fontWeight: 600, 
-                        borderRadius: '8px', 
-                        boxShadow: 'none',
+                        fontWeight: 700, 
+                        borderRadius: '10px', 
+                        boxShadow: '0 2px 5px rgba(79, 70, 229, 0.2)',
                         fontSize: '0.85rem',
-                        px: 2,
-                        '&:hover': { boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)' }
+                        px: 2.5,
+                        py: 0.8,
+                        background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
+                        '&:hover': { boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)', background: 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)' }
                     }}
                  >
                     Submit
                  </Button>
                  
-                 <div className="w-px h-6 bg-gray-200 mx-1" />
+                 <div className="w-px h-5 bg-gray-100 mx-1" />
                  
                  <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
-                    <IconButton onClick={onMaximize} size="small">
+                    <IconButton onClick={onMaximize} size="small" sx={{color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' }}}>
                         {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                     </IconButton>
                  </Tooltip>
@@ -742,40 +898,40 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
          </div>
   );
 
-  const renderRightBottomHeader = ({ isMaximized, isCollapsed, onMaximize, onCollapse }: any) => (
-      <div className="flex items-center justify-between border-b border-gray-100 px-2 h-10 bg-white shrink-0">
-            <div className="flex items-center gap-1 h-full">
+   const renderRightBottomHeader = ({ isMaximized, isCollapsed, onMaximize, onCollapse }: any) => (
+      <div className="flex items-center justify-between border-b border-gray-100 px-4 h-12 bg-white shrink-0">
+            <div className="flex bg-gray-100/80 p-1 rounded-lg gap-1">
                 <button
                     onClick={() => setActiveTab(0)}
-                    className={`flex items-center gap-2 px-3 h-full text-xs font-semibold border-b-2 transition-all ${activeTab === 0 ? 'border-primary-main text-gray-800' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 0 ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
                 >
-                        <TerminalIcon sx={{ fontSize: 16 }} className={activeTab === 0 ? "text-indigo-500" : "text-gray-400"} />
+                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 0 && result?.output ? 'bg-blue-500' : 'bg-gray-400'}`} />
                         Output
                 </button>
                 <button
                     onClick={() => setActiveTab(1)}
-                    className={`flex items-center gap-2 px-3 h-full text-xs font-semibold border-b-2 transition-all ${activeTab === 1 ? 'border-primary-main text-gray-800' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 1 ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                         {result?.status === 'passed' ? (
-                            <CheckCircle sx={{ fontSize: 16 }} className="text-green-500" />
+                            <CheckCircle2 size={14} className="text-green-500" />
                         ) : result?.status === 'failed' ? (
-                            <ErrorIcon sx={{ fontSize: 16 }} className="text-red-500" />
+                            <XCircle size={14} className="text-red-500" />
                         ) : (
-                            <div className="w-3.5 h-3.5 rounded bg-gray-200" />
+                            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 1 ? 'bg-blue-500' : 'bg-gray-400'}`} />
                         )}
-                        Test Cases
+                        Test Results
                 </button>
             </div>
             
             <div className="flex items-center gap-1">
                  <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
-                    <IconButton onClick={onMaximize} size="small">
+                    <IconButton onClick={onMaximize} size="small" sx={{color: 'text.secondary'}}>
                         {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                     </IconButton>
                  </Tooltip>
                  {!isMaximized && (
                     <Tooltip title="Collapse">
-                        <IconButton onClick={onCollapse} size="small">
+                        <IconButton onClick={onCollapse} size="small" sx={{color: 'text.secondary'}}>
                             {isCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         </IconButton>
                     </Tooltip>
@@ -793,9 +949,14 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                               {result.output}
                           </pre>
                       ) : (
-                          <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-60 gap-2">
-                              <TerminalIcon sx={{ fontSize: 32 }} />
-                              <span className="text-sm font-medium">Run your code to see output</span>
+                          <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center">
+                                <Terminal size={24} className="text-gray-300" />
+                              </div>
+                              <div className="text-center">
+                                  <p className="text-sm font-semibold text-gray-500">No Output Yet</p>
+                                  <p className="text-xs text-gray-400 mt-1">Run your code to see the execution results here.</p>
+                              </div>
                           </div>
                       )}
                   </div>
@@ -839,27 +1000,39 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                    <div key={idx} className="group bg-white rounded-lg border border-gray-200 hover:border-indigo-300 transition-all overflow-hidden shadow-sm">
                                        <div className={`h-1 w-full ${tc.status === 'passed' ? 'bg-green-500' : 'bg-red-500'}`} />
                                        <div className="p-3">
-                                           <div className="flex justify-between items-start mb-2">
+                                           <div className="flex justify-between items-center mb-2">
                                                <span className="text-xs font-bold text-slate-700">Case {idx + 1}</span>
                                                <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${tc.status === 'passed' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                                                   {tc.status}
                                                </span>
                                            </div>
-                                           <div className="grid gap-2 text-xs font-mono">
-                                               <div className="grid grid-cols-[40px_1fr] gap-2">
-                                                   <span className="text-gray-400 font-medium">In:</span>
-                                                   <span className="text-gray-700 break-all">{tc.input}</span>
-                                               </div>
-                                               <div className="grid grid-cols-[40px_1fr] gap-2">
-                                                   <span className="text-gray-400 font-medium">Exp:</span>
-                                                   <span className="text-gray-700 break-all">{tc.expected_output}</span>
-                                               </div>
-                                               {tc.status !== 'passed' && (
-                                                   <div className="grid grid-cols-[40px_1fr] gap-2 bg-red-50/50 p-1.5 rounded -mx-1.5 mt-1">
-                                                       <span className="text-red-400 font-medium">Got:</span>
-                                                       <span className="text-red-700 break-all font-bold">{tc.actual_output}</span>
-                                                   </div>
-                                               )}
+                                           
+                                           {/* Single Line Layout for Input/Exp/Actual */}
+                                           <div className="flex items-center gap-4 text-xs font-mono bg-gray-50/50 p-2 rounded-md">
+                                                {/* Input */}
+                                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                    <span className="text-gray-400 font-bold shrink-0">In:</span>
+                                                    <span className="text-gray-700 truncate" title={tc.input}>{tc.input}</span>
+                                                </div>
+
+                                                <div className="w-px h-3 bg-gray-300 shrink-0" />
+
+                                                {/* Expected */}
+                                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                    <span className="text-gray-400 font-bold shrink-0">Exp:</span>
+                                                    <span className="text-green-700 truncate" title={tc.expected_output}>{tc.expected_output}</span>
+                                                </div>
+
+                                                {/* Actual (Only if failed) */}
+                                                {tc.status !== 'passed' && (
+                                                    <>
+                                                        <div className="w-px h-3 bg-red-200 shrink-0" />
+                                                        <div className="flex items-center gap-2 min-w-0 flex-1 bg-red-50 px-1 rounded">
+                                                            <span className="text-red-400 font-bold shrink-0">Got:</span>
+                                                            <span className="text-red-700 truncate font-bold" title={tc.actual_output}>{tc.actual_output}</span>
+                                                        </div>
+                                                    </>
+                                                )}
                                            </div>
                                        </div>
                                    </div>
@@ -892,7 +1065,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         PaperProps={{
-            sx: { width: 320, borderRadius: '0 16px 16px 0', border: 'none' }
+            sx: { width: 450, borderRadius: '0 16px 16px 0', border: 'none' }
         }}
       >
           <Box p={3} display="flex" justifyContent="space-between" alignItems="center" borderBottom="1px solid #f3f4f6">
@@ -962,26 +1135,267 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         renderRightBottomHeader={renderRightBottomHeader}
       />
       
-      {/* VISUALIZER DIALOG */}
-      <Dialog 
+    {/* VISUALIZER DIALOG */}
+       <Dialog 
         open={showVisualizer} 
         onClose={() => setShowVisualizer(false)}
         maxWidth="xl"
         fullWidth
         PaperProps={{
-            sx: { height: '85vh', borderRadius: 3 }
+            sx: { 
+              height: '85vh', 
+              borderRadius: 3,
+              bgcolor: '#0f172a', // Dark background for the whole dialog
+              color: 'white'
+            }
         }}
       >
-          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', px: 3, py: 2 }}>
-              <Typography variant="h6" fontWeight={700}>Code Visualization</Typography>
-              <IconButton onClick={() => setShowVisualizer(false)} size="small">
+          <DialogTitle sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            borderBottom: '1px solid rgba(255,255,255,0.1)', // Subtle border
+            bgcolor: '#1e293b', // Slightly lighter dark for header
+            px: 3, 
+            py: 2 
+          }}>
+              <Box display="flex" alignItems="center" gap={1.5}>
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/10 text-blue-400">
+                  <TerminalIcon fontSize="small" />
+                </div>
+                <Typography variant="h6" fontWeight={700} sx={{ letterSpacing: '0.5px' }}>
+                  Code Visualization
+                </Typography>
+              </Box>
+              <IconButton 
+                onClick={() => setShowVisualizer(false)} 
+                size="small"
+                sx={{ color: 'rgba(255,255,255,0.7)', '&:hover': { color: 'white', bgcolor: 'rgba(255,255,255,0.1)' } }}
+              >
                   <CloseIcon />
               </IconButton>
           </DialogTitle>
-          <DialogContent sx={{ p: 0, overflow: 'auto', height: '100%' }}>
+          <DialogContent sx={{ p: 0, overflow: 'hidden', height: '100%', bgcolor: '#0f172a' }}>
               <PythonVisualizer code={code} onChangeCode={setCode} />
           </DialogContent>
       </Dialog>
+
+
+      {/* SUBMIT CONFIRMATION DIALOG */}
+      <Dialog
+        open={submitDialogOpen}
+        onClose={() => setSubmitDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+            sx: { borderRadius: 4, width: '100%', maxWidth: 460, overflow: 'visible' } // Overflow visible for aesthetic effects if needed
+        }}
+      >
+          <div className="p-0">
+               {/* Header Background */}
+               <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-t-2xl text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <CloudUploadIcon sx={{ fontSize: 120 }} />
+                    </div>
+                    <div className="relative z-10 flex flex-col items-center text-center">
+                        <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 shadow-inner ring-1 ring-white/30">
+                            <CloudUploadIcon sx={{ fontSize: 32, color: 'white' }} />
+                        </div>
+                        <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.5px' }}>
+                            Submit Solution?
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1, opacity: 0.9, px: 2, lineHeight: 1.5 }}>
+                            Ready to test your code? This will run against all test cases and record your score.
+                        </Typography>
+                    </div>
+               </div>
+               
+               <div className="p-6 flex flex-col gap-3">
+                   {/* Primary Action: Submit */}
+                   <Button 
+                     onClick={handleConfirmSubmit}
+                     variant="contained" 
+                     fullWidth
+                     size="large"
+                     disabled={submitting}
+                     startIcon={submitting ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
+                     sx={{ 
+                         borderRadius: 3, 
+                         textTransform: 'none', 
+                         fontWeight: 700, 
+                         height: 56,
+                         fontSize: '1.05rem',
+                         background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
+                         boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                         '&:hover': { 
+                            background: 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)', 
+                            boxShadow: '0 8px 20px rgba(79, 70, 229, 0.4)',
+                            transform: 'translateY(-1px)'
+                         },
+                         transition: 'all 0.2s ease'
+                     }}
+                   >
+                       {submitting ? 'Submitting...' : 'Confirm Submission'}
+                   </Button>
+                   
+                   <Button 
+                     onClick={() => setSubmitDialogOpen(false)}
+                     variant="text" 
+                     fullWidth
+                     sx={{ 
+                         mt: 1, 
+                         borderRadius: 3, 
+                         textTransform: 'none', 
+                         fontWeight: 600, 
+                         color: 'text.secondary',
+                         height: 48,
+                         '&:hover': { bgcolor: 'gray.50', color: 'text.primary' }
+                     }}
+                   >
+                       Cancel
+                   </Button>
+               </div>
+          </div>
+      </Dialog>
+
+      {/* SAVE OPTIONS DIALOG */}
+      <Dialog
+        open={saveDialogOpen}
+        onClose={() => setSaveDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+            sx: { borderRadius: 4, width: '100%', maxWidth: 520 }
+        }}
+      >
+          <div className="p-6">
+               <div className="mb-6">
+                   <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
+                             <Save size={20} />
+                        </div>
+                        <Typography variant="h5" fontWeight={800} sx={{ color: '#0f172a' }}>
+                            Save Progress
+                        </Typography>
+                   </div>
+                   <Typography variant="body2" color="text.secondary" sx={{ ml: 1, lineHeight: 1.6 }}>
+                       Choose how you want to save your current work.
+                   </Typography>
+               </div>
+               
+               <div className="flex flex-col gap-3">
+                    {/* Action Card: Save Draft */}
+                    <button
+                        onClick={handleSaveDraft}
+                        disabled={isSaving}
+                        className="group flex items-start gap-4 p-4 rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/30 transition-all text-left w-full outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                        <div className="w-10 h-10 rounded-full bg-blue-100/50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                            {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">Save Draft</h4>
+                            <p className="text-sm text-slate-500 mt-0.5 leading-snug">
+                                Save your changes and continue working on this question.
+                            </p>
+                        </div>
+                    </button>
+
+                    {/* Action Card: Save & Exit */}
+                    <button
+                        onClick={handleSaveAndExit}
+                        disabled={isSaving}
+                        className="group flex items-start gap-4 p-4 rounded-2xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all text-left w-full outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                        <div className="w-10 h-10 rounded-full bg-indigo-100/50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                            {isSaving ? <Loader2 size={18} className="animate-spin" /> : <LogOut size={18} />}
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">Save & Exit</h4>
+                            <p className="text-sm text-slate-500 mt-0.5 leading-snug">
+                                Save your progress and return to the question list.
+                            </p>
+                        </div>
+                    </button>
+                    
+                   <Button 
+                     onClick={() => setSaveDialogOpen(false)}
+                     variant="text" 
+                     fullWidth
+                     sx={{ mt: 1, borderRadius: 2, textTransform: 'none', fontWeight: 600, color: 'text.secondary', height: 48 }}
+                   >
+                       Cancel
+                   </Button>
+               </div>
+          </div>
+      </Dialog>
+
+      {/* EXIT CONFIRMATION DIALOG */}
+      <Dialog
+        open={exitDialogOpen}
+        onClose={() => setExitDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+            sx: { 
+                borderRadius: 4, 
+                width: '100%', 
+                maxWidth: 480,
+                p: 1
+            }
+        }}
+      >
+          <div className="p-6 text-center">
+               <div className="mx-auto w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-5 text-red-600 shadow-sm ring-4 ring-red-50/50">
+                   <LogOut size={32} />
+               </div>
+               <Typography variant="h5" fontWeight={800} gutterBottom sx={{ color: '#111827' }}>
+                   Exit Assessment?
+               </Typography>
+               <Typography variant="body1" color="text.secondary" sx={{ mb: 5, px: 2, lineHeight: 1.6 }}>
+                   Are you sure you want to exit? Your progress is saved, but you will leave the current session.
+               </Typography>
+               
+               <div className="flex gap-3">
+                   <Button 
+                    fullWidth 
+                    variant="outlined" 
+                    onClick={() => setExitDialogOpen(false)}
+                    sx={{ 
+                        borderRadius: '12px', 
+                        height: 48,
+                        textTransform: 'none', 
+                        fontWeight: 600,
+                        borderColor: 'gray.200',
+                        color: 'gray.700',
+                        fontSize: '1rem',
+                        '&:hover': { borderColor: 'gray.400', bgcolor: 'gray.50' }
+                    }}
+                   >
+                       Cancel
+                   </Button>
+                   <Button 
+                    fullWidth 
+                    variant="contained" 
+                    onClick={confirmExit}
+                    sx={{ 
+                        borderRadius: '12px', 
+                        height: 48,
+                        textTransform: 'none', 
+                        fontWeight: 700,
+                        fontSize: '1rem',
+                        bgcolor: '#ef4444',
+                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                        '&:hover': { bgcolor: '#dc2626', boxShadow: '0 6px 16px rgba(239, 68, 68, 0.4)' }
+                    }}
+                   >
+                       Confirm Exit
+                   </Button>
+               </div>
+          </div>
+      </Dialog>
+      
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover theme="light" />
     </div>
   );
 };
