@@ -773,7 +773,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     `}</style>
 
                     {/* Complexity Badges - Moved to Top for visibility */}
-                    {(question.expected_time_complexity || question.expected_space_complexity) && (
+                    {/* {(question.expected_time_complexity || question.expected_space_complexity) && (
                         <div className="flex flex-wrap gap-2 mb-6">
                             {question.expected_time_complexity && (
                                 <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100/50 shadow-sm transition-hover hover:bg-blue-100/50">
@@ -788,7 +788,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                 </div>
                             )}
                         </div>
-                    )}
+                    )} */}
 
                     <div
                         className="prose prose-zinc max-w-none text-zinc-600 leading-relaxed font-normal question-content-wrapper prose-headings:text-zinc-800 prose-headings:font-bold prose-p:mb-4 prose-code:text-pink-600 prose-code:bg-pink-50 prose-code:px-1 prose-code:rounded prose-code:font-semibold prose-pre:bg-zinc-50 prose-pre:border prose-pre:border-zinc-100"
@@ -1130,14 +1130,14 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                         </div>
 
                         {/* Runtime - Minimal */}
-                        {result && (
+                        {/* {result && (
                             <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium">
                                 <span className="uppercase tracking-wider text-[10px]">Time</span>
                                 <span className="font-mono text-zinc-700 bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">
                                     {result.runtime?.toFixed(0)} ms
                                 </span>
                             </div>
-                        )}
+                        )} */}
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
