@@ -12,7 +12,8 @@ import {
   Alert,
   Chip,
   Tooltip,
-  Divider
+  Divider,
+  Collapse
 } from '@mui/material';
 import {
   PlayArrow,
@@ -21,8 +22,11 @@ import {
   SkipPrevious,
   BugReport as BugIcon,
   Speed,
-  Refresh
+  Refresh,
+  KeyboardArrowDown,
+  KeyboardArrowRight
 } from '@mui/icons-material';
+import types from 'prop-types'; // Note: pyodide execution allows importing types in python, not JS here, but we are in TSX.
 
 // --- TYPES ---
 
@@ -54,41 +58,72 @@ import sys
 import json
 import io
 import inspect
+import types
 
 class TraceRunner:
-    def __init__(self):
+    def __init__(self, max_steps=2000):
         self.trace_data = []
         self.stdout_buffer = io.StringIO()
+        self.max_steps = max_steps
+        self.step_count = 0
         
     def serialize_obj(self, obj, depth=0):
-        if depth > 2: return {"type": "ref", "value": "... (max depth)"}
+        if depth > 4: return {"type": "ref", "value": "..."}
         
-        t = type(obj).__name__
         try:
+            t_name = type(obj).__name__
+            
+            # Primitives
             if isinstance(obj, (int, float, bool, type(None))):
                 return {"type": "primitive", "value": obj}
             elif isinstance(obj, str):
                 return {"type": "string", "value": obj}
+            
+            # Collections
             elif isinstance(obj, list):
-                return {"type": "list", "value": [self.serialize_obj(i, depth+1) for i in obj], "id": id(obj)}
+                if depth > 2: return {"type": "list", "value": "[...]"}
+                return {"type": "list", "value": [self.serialize_obj(i, depth+1) for i in obj]}
             elif isinstance(obj, tuple):
-                return {"type": "tuple", "value": [self.serialize_obj(i, depth+1) for i in obj], "id": id(obj)}
+                 if depth > 2: return {"type": "tuple", "value": "(...)"}
+                 return {"type": "tuple", "value": [self.serialize_obj(i, depth+1) for i in obj]}
             elif isinstance(obj, set):
-                return {"type": "set", "value": [self.serialize_obj(i, depth+1) for i in list(obj)], "id": id(obj)}
+                 if depth > 2: return {"type": "set", "value": "{...}"}
+                 return {"type": "set", "value": [self.serialize_obj(i, depth+1) for i in list(obj)]}
             elif isinstance(obj, dict):
-                return {"type": "dict", "value": [[self.serialize_obj(k, depth+1), self.serialize_obj(v, depth+1)] for k, v in obj.items()], "id": id(obj)}
+                 if depth > 2: return {"type": "dict", "value": "{...}"}
+                 return {"type": "dict", "value": [[self.serialize_obj(k, depth+1), self.serialize_obj(v, depth+1)] for k, v in obj.items()]}
+            
+            # Functions & Methods
+            elif isinstance(obj, (types.FunctionType, types.MethodType)):
+                 return {"type": "function", "value": f"function {obj.__name__}()"}
+            
+            # Classes
+            elif isinstance(obj, type):
+                 return {"type": "class", "value": f"class {obj.__name__}"}
+            
+            # Custom Objects (Instances)
+            elif hasattr(obj, '__dict__'):
+                 if depth > 2: return {"type": "instance", "class": t_name, "value": "{...}"}
+                 attrs = {k: self.serialize_obj(v, depth+1) for k, v in obj.__dict__.items() if not k.startswith('__')}
+                 return {"type": "instance", "class": t_name, "value": attrs}
+            
             else:
-                return {"type": "object", "value": repr(obj), "id": id(obj)}
-        except:
-             return {"type": "error", "value": "<unserializable>"}
+                r = repr(obj)
+                if ' object at 0x' in r:
+                    r = r.split(' at 0x')[0] + '>'
+                return {"type": "object", "value": r}
 
-    def trace_calls(self, frame, event, arg):
-        if event != 'call': return
-        return self.trace_lines
+        except Exception as e:
+             return {"type": "error", "value": f"<serialize_err: {str(e)}>"}
 
     def trace_lines(self, frame, event, arg):
         if event not in ['line', 'return', 'exception', 'call']: return
         
+        # Safety Check
+        self.step_count += 1
+        if self.step_count > self.max_steps:
+            raise Exception(f"Step limit exceeded ({self.max_steps}). Infinite loop detected?")
+
         co = frame.f_code
         if co.co_filename.startswith('<') and co.co_filename != '<string>': return 
 
@@ -120,6 +155,9 @@ class TraceRunner:
         old_stdout = sys.stdout
         sys.stdout = self.stdout_buffer
         self.trace_data = [] # Reset
+        self.step_count = 0
+        self.stdout_buffer.seek(0)
+        self.stdout_buffer.truncate(0)
         
         try:
             sys.settrace(self.trace_lines)
@@ -133,7 +171,7 @@ class TraceRunner:
                     "stack": [],
                     "locals": {},
                     "globals": {},
-                    "stdout": self.stdout_buffer.getvalue() + f"\\nException: {str(e)}"
+                    "stdout": self.stdout_buffer.getvalue() + f"\\nException: {type(e).__name__}: {str(e)}"
                 })
             finally:
                 sys.settrace(None)
@@ -142,7 +180,7 @@ class TraceRunner:
             
         return json.dumps(self.trace_data)
 
-runner = TraceRunner()
+runner = TraceRunner(max_steps=2000)
 `;
 
 // --- UI COMPONENTS ---
@@ -150,13 +188,11 @@ runner = TraceRunner()
 const EditableValue: React.FC<{ value: any; name?: string; onEdit?: (newVal: string) => void }> = ({ value, name, onEdit }) => {
     const [editing, setEditing] = useState(false);
     const [tempVal, setTempVal] = useState(String(value.value));
-    
-    // Primitive check
     const isPrimitive = ['primitive', 'string'].includes(value?.type);
 
     const handleCommit = () => {
         setEditing(false);
-        if (onEdit && tempVal !== String(value.value)) { // Basic check
+        if (onEdit && tempVal !== String(value.value)) { 
             onEdit(tempVal);
         }
     };
@@ -169,15 +205,13 @@ const EditableValue: React.FC<{ value: any; name?: string; onEdit?: (newVal: str
                 onChange={(e) => setTempVal(e.target.value)}
                 onBlur={handleCommit}
                 onKeyDown={(e) => e.key === 'Enter' && handleCommit()}
-                className="bg-slate-700 text-white text-xs px-1 rounded border border-blue-500 outline-none min-w-[40px]"
-                style={{ width: `${Math.max(tempVal.length, 3)}ch` }}
+                className="bg-input text-foreground text-xs px-1 rounded border border-primary outline-none min-w-[40px]"
+                style={{ width: `${Math.max(tempVal.length, 3)}ch`, maxWidth: '100%' }}
             />
         );
     }
 
-    // Interactive Handler
     const handleClick = () => {
-        // Only allow editing primitives for now to keep it safe
         if (isPrimitive && onEdit) {
             setTempVal(String(value.value));
             setEditing(true);
@@ -187,11 +221,11 @@ const EditableValue: React.FC<{ value: any; name?: string; onEdit?: (newVal: str
     return (
         <span 
              onClick={handleClick} 
-             className={`${isPrimitive && onEdit ? 'cursor-pointer hover:bg-white/10 rounded px-1 -mx-1 transition-colors relative group' : ''}`}
+             className={`${isPrimitive && onEdit ? 'cursor-pointer hover:bg-muted rounded px-1 -mx-1 transition-colors relative group' : ''}`}
         >
             <HeapValue data={value} />
             {isPrimitive && onEdit && (
-                <span className="absolute -top-4 left-0 bg-blue-600 text-[9px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                <span className="absolute -top-4 left-0 bg-primary text-primary-foreground text-[9px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                     Click to Edit
                 </span>
             )}
@@ -202,22 +236,41 @@ const EditableValue: React.FC<{ value: any; name?: string; onEdit?: (newVal: str
 const HeapValue: React.FC<{ data: any }> = ({ data }) => {
     if (!data) return <span>-</span>;
     
-    if (data.type === 'primitive') return <span className="text-amber-400 font-mono">{String(data.value)}</span>;
-    if (data.type === 'string') return <span className="text-emerald-400 font-mono">"{data.value}"</span>;
-    if (data.type === 'object') return <span className="text-gray-400 italic">{data.value}</span>;
+    if (data.type === 'primitive') return <span className="text-chart-3 font-mono">{String(data.value)}</span>;
+    if (data.type === 'string') return <span className="text-chart-2 font-mono">"{data.value}"</span>;
+    if (data.type === 'function') return <span className="text-chart-5 font-mono italic">{data.value}</span>;
+    if (data.type === 'class') return <span className="text-chart-1 font-bold">{data.value}</span>;
+    if (data.type === 'object') return <span className="text-muted-foreground italic">{data.value}</span>;
     
-    // Recursive rendering for collections (Edit disabled for inner items for simplicity for now)
+    if (data.type === 'instance') {
+        const entries = Object.entries(data.value);
+        if (entries.length === 0) return <span className="text-muted-foreground">{data.class} {'{}'}</span>;
+        
+        return (
+            <div className="flex flex-col gap-1 item-start">
+                 <span className="text-xs font-bold text-chart-1">{data.class}</span>
+                 <div className="border border-border bg-muted/30 rounded p-1.5 pl-2 flex flex-col gap-1">
+                     {entries.map(([k, v]: any, i: number) => (
+                         <div key={i} className="flex gap-2 text-sm">
+                              <span className="text-muted-foreground font-mono text-xs">{k}:</span>
+                              <HeapValue data={v} />
+                         </div>
+                     ))}
+                 </div>
+            </div>
+        );
+    }
+    
     if (data.type === 'list' || data.type === 'tuple' || data.type === 'set') {
         return (
             <div className="flex flex-wrap gap-1 items-center">
-                <span className="text-xs text-gray-500 mr-1">{data.type === 'list' ? 'list' : data.type}</span>
-                <div className={`flex border ${data.type === 'list' ? 'border-blue-500/30 bg-blue-500/10' : 'border-purple-500/30 bg-purple-500/10'} rounded overflow-hidden`}>
+                <div className={`flex items-center border ${data.type === 'list' ? 'border-chart-1/30 bg-chart-1/10' : 'border-chart-4/30 bg-chart-4/10'} rounded overflow-hidden`}>
                     {data.value.map((item: any, i: number) => (
-                        <div key={i} className="px-2 py-1 border-r border-white/10 last:border-0 text-sm">
+                        <div key={i} className="px-2 py-0.5 border-r border-border/50 last:border-0 text-sm">
                             <HeapValue data={item} />
                         </div>
                     ))}
-                    {data.value.length === 0 && <span className="px-2 py-1 text-xs text-gray-500">empty</span>}
+                    {data.value.length === 0 && <span className="px-2 py-0.5 text-xs text-muted-foreground">empty</span>}
                 </div>
             </div>
         );
@@ -226,15 +279,14 @@ const HeapValue: React.FC<{ data: any }> = ({ data }) => {
     if (data.type === 'dict') {
          return (
             <div className="flex flex-col gap-1">
-                 <span className="text-xs text-gray-500">dict</span>
-                 <div className="border border-orange-500/30 bg-orange-500/10 rounded p-1">
+                 <div className="border border-chart-3/30 bg-chart-3/10 rounded p-1">
                      {data.value.map(([k, v]: any, i: number) => (
-                         <div key={i} className="flex gap-2 text-sm">
-                              <span className="font-mono text-gray-300"><HeapValue data={k} />:</span>
+                         <div key={i} className="flex gap-2 text-sm items-center">
+                              <span className="font-mono text-muted-foreground"><HeapValue data={k} />:</span>
                               <HeapValue data={v} />
                          </div>
                      ))}
-                     {data.value.length === 0 && <span className="text-xs text-gray-500 px-1">empty</span>}
+                     {data.value.length === 0 && <span className="text-xs text-muted-foreground px-1">empty</span>}
                  </div>
             </div>
          );
@@ -259,15 +311,15 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
   const [localCode, setLocalCode] = useState(code);
   const [stdIn, setStdIn] = useState("");
   const [showInput, setShowInput] = useState(false);
-  const [waitingForInput, setWaitingForInput] = useState(false); // New State
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const [waitingForInput, setWaitingForInput] = useState(false); 
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null); // Fixed Type
 
   // Sync prop code
   useEffect(() => { if (!isLiveMode) setLocalCode(code); }, [code, isLiveMode]);
 
   // Auto-detect input requirement
   useEffect(() => {
-      if (code.includes('input(') || localCode.includes('input(')) {
+      if ((code || "").includes('input(') || (localCode || "").includes('input(')) {
           setShowInput(true);
       }
   }, [code, localCode]);
@@ -279,62 +331,32 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
 
   const updateCode = (newVal: string) => {
       setLocalCode(newVal);
+      if (error) setError(null);
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
           if (onChangeCode) onChangeCode(newVal);
       }, 800);
   };
 
-  // Input Change Handler (Re-run on input change too)
   const handleInputChange = (val: string) => {
       setStdIn(val);
-      // We rely on stdIn dependency in useEffect to trigger re-run, 
-      // but we should debounce it to avoid too many runs while typing.
-      // However, useEffect [stdIn] triggers immediately. 
-      // Correct approach: Update local state, then debounce-update a "debouncedStdIn" or just reuse the timer logic to trigger a force update?
-      // Simpler: Just rely on the useEffect debouncing?? No, the useEffect [stdIn] is not debounced.
-      // Let's implement valid debounce for stdin triggering.
-      
-      // actually, to keep it simple, we will just setStdIn immediately and let it run. 
-      // If it's too slow, we can add debounce later. For now, immediate is "Live".
   };
 
-  // Variable Hot-Edit Handler
   const handleVarEdit = (name: string, newVal: string) => {
-      // Heuristic: Try to find "name = ..." 
-      // This is simple regex replacement. It won't work for complex scopes but works for the user's "global init" case.
-      // We look for: name = [anything] or name= [anything]
-      // We essentially try to find the assignment of this variable.
-      
-      const regex = new RegExp(`^(\\s*)${name}\\s*=\\s*.*$`, 'm'); // Multiline find
+      const regex = new RegExp(`^(\\s*)${name}\\s*=\\s*.*$`, 'm'); 
       const match = localCode.match(regex);
       
       if (match) {
-          // Replace the whole line with "name = newVal"
-          // We preserve indentation (match[1])
           const indentation = match[1] || '';
-          
-          // If newVal is a string, wrap quotes if not already? The input gives raw string "10" or "hello".
-          // User types exactly what they want in python literal value.
-          
           const newCode = localCode.replace(regex, `${indentation}${name} = ${newVal}`);
-          // enable live mode so they can see it happened
           setIsLiveMode(true); 
           updateCode(newCode);
-      } else {
-          // Toast or ignore if not found assignment
-          console.log("Could not find assignment for variable " + name);
       }
-  };
-
-  // Logger
-  const log = (msg: string, data?: any) => {
-    console.log(`[Visualizer]: ${msg}`, data || '');
   };
 
   // Playback
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>; // Fixed Type
     if (isPlaying) {
       interval = setInterval(() => {
         setCurrentStep((prev) => {
@@ -359,6 +381,7 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
         const script = document.createElement('script');
         script.src = "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js";
         script.async = true;
+        
         script.onload = async () => {
             // @ts-ignore
             await initPyodide(window.loadPyodide);
@@ -383,17 +406,16 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
     return () => { mounted = false; };
   }, []);
 
-  // Run Trace (Triggered by code prop change from parent)
+  // Run Trace
   useEffect(() => {
     if (!pyodide || !code) return;
     const generateTrace = async () => {
       try {
-        // If live mode, keep current step if possible? No, safer to reset or try to stay close.
-        // For now reset to 0 or keep absolute index if valid
         setError(null);
 
+        // Reset imports in case
         await pyodide.runPythonAsync(TRACER_SCRIPT);
-        pyodide.globals.set("user_code_str", code);
+        pyodide.globals.set("user_code_str", localCode || code);
         pyodide.globals.set("user_input_str", stdIn); 
         await pyodide.runPythonAsync(`import sys; import io; sys.stdin = io.StringIO(user_input_str)`);
         
@@ -403,37 +425,45 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
         if (!Array.isArray(parsedTrace) || parsedTrace.length === 0) {
              setTrace([{ line: 0, event: 'return', func_name: '<module>', stack: [], locals: {}, globals: {}, stdout: "No output." }]);
         } else {
-            setTrace(parsedTrace);
-            
             // Check for EOFError (Input needed)
             const last = parsedTrace[parsedTrace.length - 1];
-            if (last.event === 'exception' && (last.stdout.includes("EOFError") || (last.stack?.length > 0 && last.stack[0].name === 'input'))) {
-                 // Remove the exception step so visualizer stops on the line causing it
-                 parsedTrace.pop();
-                 setTrace([...parsedTrace]);
-                 setWaitingForInput(true); // New state we need to add
+            
+            // Check for EOFError string or exception
+            if (last && last.event === 'exception' && String(last.stdout).includes('EOFError')) {
+                 // Mark as waiting
+                 setWaitingForInput(true);
                  if (!showInput) setShowInput(true);
+
+                 // Show the partial trace up to the pause
+                 const pausedStep = { ...last, event: 'line' as const };
+                 const finalTrace = [...parsedTrace.slice(0, -1), pausedStep];
+                 setTrace(finalTrace);
+                 setCurrentStep(finalTrace.length - 1);
             } else {
                  setWaitingForInput(false);
-            }
-            
-            if (currentStep >= parsedTrace.length) {
-                setCurrentStep(Math.max(0, parsedTrace.length - 1));
+                 setTrace(parsedTrace);
+                 if (currentStep >= parsedTrace.length) {
+                    setCurrentStep(Math.max(0, parsedTrace.length - 1));
+                 }
             }
         }
       } catch (err: any) {
-        // If the unexpected happens (like Pyodide crash)
+        // Fallback for uncaught pyodide crash
         if (err.message && err.message.includes("EOFError")) {
              setShowInput(true);
              setWaitingForInput(true);
-             // Don't set global error
         } else {
+             console.error(err);
              setError("Execution Failed: " + err.message);
         }
       }
     };
-    generateTrace();
-  }, [pyodide, code, stdIn]);
+    
+    // Debounce to prevent rapid fire
+    const timer = setTimeout(generateTrace, 500);
+    return () => clearTimeout(timer);
+
+  }, [pyodide, code, localCode, stdIn]); // Dependencies
 
   if (loading) return (
     <Box 
@@ -442,60 +472,68 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
       flexDirection="column" 
       alignItems="center" 
       justifyContent="center" 
-      bgcolor="#0f172a" 
-      color="white"
+      className="bg-background text-foreground"
       gap={3}
     >
       <div className="relative">
-        <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-xl animate-pulse" />
-        <CircularProgress size={50} thickness={4} sx={{ color: '#38bdf8', position: 'relative' }} />
+        <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
+        <CircularProgress size={50} thickness={4} sx={{ color: 'var(--primary)', position: 'relative' }} />
       </div>
       <Box textAlign="center">
-        <Typography variant="h6" fontWeight={600} sx={{ color: '#e2e8f0', mb: 1 }}>
+        <Typography variant="h6" fontWeight={600} sx={{ color: 'text.primary', mb: 1 }}>
           Initializing Python Engine
         </Typography>
-        <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           {initStatus}
         </Typography>
       </Box>
     </Box>
   );
-  if (error) return <Alert severity="error">{error}</Alert>;
 
   const currentData = trace[currentStep] || {};
 
   const handleLineClick = (lineIndex: number) => {
       const targetLine = lineIndex + 1;
-      
-      // Find next occurrence after current step
       let nextStepIndex = trace.findIndex((step, idx) => idx > currentStep && step.line === targetLine);
-      
-      // If not found ahead, wrap around to find from start
       if (nextStepIndex === -1) {
           nextStepIndex = trace.findIndex((step) => step.line === targetLine);
       }
-
       if (nextStepIndex !== -1) {
           setCurrentStep(nextStepIndex);
-      } else {
-          // Optional: Show toast "Line not executed"
       }
   };
 
   return (
-    <Box display="flex" flexDirection="column" height="100%" bgcolor="#0f172a" color="white">
+    <Box display="flex" flexDirection="column" height="100%" className="bg-background text-foreground">
         
+        {/* ERROR BANNER */}
+        {error && (
+            <Alert 
+                severity="error" 
+                onClose={() => setError(null)}
+                sx={{ 
+                    borderRadius: 0, 
+                    borderBottom: '1px solid rgba(255,255,255,0.1)',
+                    bgcolor: 'rgba(239, 68, 68, 0.1)',
+                    color: '#fca5a5',
+                    '& .MuiAlert-icon': { color: '#f87171' }
+                }}
+            >
+                {error}
+            </Alert>
+        )}
+
         {/* TOOLBAR */}
-        <Box p={1.5} borderBottom="1px solid rgba(255,255,255,0.1)" display="flex" alignItems="center" gap={2} bgcolor="#1e293b">
-             <IconButton onClick={() => setCurrentStep(Math.max(0, currentStep - 1))} disabled={currentStep === 0} sx={{ color: 'white' }}>
+        <Box p={1.5} className="border-b border-border bg-card" display="flex" alignItems="center" gap={2}>
+             <IconButton onClick={() => setCurrentStep(Math.max(0, currentStep - 1))} disabled={currentStep === 0} sx={{ color: 'text.primary' }}>
                  <SkipPrevious />
              </IconButton>
              
-             <IconButton onClick={() => setIsPlaying(!isPlaying)} sx={{ color: '#38bdf8', bgcolor: 'rgba(56, 189, 248, 0.1)', '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.2)' } }}>
+             <IconButton onClick={() => setIsPlaying(!isPlaying)} sx={{ color: 'primary.main', bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }} className="bg-primary/10 hover:bg-primary/20">
                  {isPlaying ? <Pause /> : <PlayArrow />}
              </IconButton>
              
-             <IconButton onClick={() => setCurrentStep(Math.min(trace.length - 1, currentStep + 1))} disabled={currentStep >= trace.length - 1} sx={{ color: 'white' }}>
+             <IconButton onClick={() => setCurrentStep(Math.min(trace.length - 1, currentStep + 1))} disabled={currentStep >= trace.length - 1} sx={{ color: 'text.primary' }}>
                  <SkipNext />
              </IconButton>
 
@@ -504,14 +542,14 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
                    value={currentStep} 
                    max={Math.max(0, trace.length - 1)} 
                    onChange={(_, v) => setCurrentStep(v as number)}
-                   sx={{ color: '#38bdf8', height: 6 }}
+                   sx={{ color: 'primary.main', height: 6 }}
                 />
              </Box>
              
              <Box display="flex" alignItems="center" gap={2} mr={2}>
                  <Box display="flex" alignItems="center" gap={1} sx={{ opacity: isLiveMode ? 1 : 0.5, transition: '0.2s' }}>
-                     <Refresh sx={{ fontSize: 16, color: isLiveMode ? '#4ade80' : 'gray', animation: isLiveMode ? 'spin 2s linear infinite' : 'none' }} />
-                     <Typography variant="caption" sx={{ color: isLiveMode ? '#4ade80' : 'gray', fontWeight: 700 }}>LIVE RUN</Typography>
+                     <Refresh sx={{ fontSize: 16, color: isLiveMode ? 'success.main' : 'text.disabled', animation: isLiveMode ? 'spin 2s linear infinite' : 'none' }} />
+                     <Typography variant="caption" sx={{ color: isLiveMode ? 'success.main' : 'text.disabled', fontWeight: 700 }}>LIVE RUN</Typography>
                      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
                  </Box>
 
@@ -527,7 +565,7 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
 
                  <Tooltip title="Allow editing code to immediately re-run simulation">
                     <Chip 
-                        label={isLiveMode ? "EDITING" : "READ ONLY"} 
+                        label={isLiveMode ? "EDITING" : "Edit Code"} 
                         size="small" 
                         color={isLiveMode ? "success" : "default"}
                         onClick={() => setIsLiveMode(!isLiveMode)}
@@ -536,21 +574,21 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
                  </Tooltip>
              </Box>
 
-             <Typography variant="body2" color="gray" fontWeight={600} minWidth={80} textAlign="right">
+             <Typography variant="body2" color="text.secondary" fontWeight={600} minWidth={80} textAlign="right">
                  {currentStep + 1} / {trace.length}
              </Typography>
         </Box>
 
         {/* MAIN SPLIT */}
-        <Grid container flex={1} overflow="hidden">
+        <Grid container flex={1} overflow="hidden" sx={{ height: 'calc(100% - 60px)' }}> {/* Subtract toolbar height approx */}
             
             {/* LEFT: CODE & OUTPUT */}
-            <Grid item xs={12} md={7} borderRight="1px solid rgba(255,255,255,0.1)" display="flex" flexDirection="column">
+            <Grid item xs={12} md={7} className="border-r border-border" display="flex" flexDirection="column" height="100%" overflow="hidden">
                 
                 {/* EDITOR */}
-                <Box flex={1} overflow="auto" p={2} bgcolor="#0f172a" position="relative">
+                <Box flex={1} overflow="auto" p={2} className="bg-background" position="relative">
                     <Box display="flex" justifyContent="space-between">
-                         <Typography variant="caption" color="gray" sx={{ mb: 1, display: 'block', letterSpacing: 1 }}>
+                         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', letterSpacing: 1 }}>
                              {isLiveMode ? "LIVE EDITOR (TYPE TO AUTO-RUN)" : "CODE EXECUTION (CLICK LINE TO JUMP)"}
                          </Typography>
                     </Box>
@@ -562,31 +600,32 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
                             fontFamily: 'monospace', 
                             fontSize: '14px', 
                             lineHeight: '1.6', 
-                            bgcolor: '#1e293b', 
-                            color: isLiveMode ? 'transparent' : '#e2e8f0', // Hide text in live mode, keep bg
+                            bgcolor: 'background.paper', // Or card
+                            color: isLiveMode ? 'transparent' : 'text.primary', 
                             boxShadow: 'none',
                             position: 'relative'
                         }}
                     >
-                        {localCode.split('\n').map((line, i) => {
+                        {(localCode || "").split('\n').map((line, i) => {
                              const isCurrentLine = (i + 1) === currentData.line;
                              const isException = currentData.event === 'exception';
                              return (
                                <Box 
                                  key={i} 
                                  onClick={() => !isLiveMode && handleLineClick(i)}
-                                 sx={{ 
+                                 sx={{
+                                     // We might need alpha for lights. MUI theme usually handles it or use alpha utility
+                                     // But using direct colors for highlighting is sometimes safer for legibility if theme is unknown
                                      bgcolor: isCurrentLine ? (isException ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)') : 'transparent',
                                      borderLeft: isCurrentLine ? (isException ? '3px solid #ef4444' : '3px solid #10b981') : '3px solid transparent',
                                      borderRadius: 1,
                                      px: 1, 
                                      display: 'flex',
                                      cursor: isLiveMode ? 'text' : 'pointer',
-                                     '&:hover': { bgcolor: (!isLiveMode && isCurrentLine) ? undefined : 'rgba(255,255,255,0.05)' }
+                                     '&:hover': { bgcolor: (!isLiveMode && isCurrentLine) ? undefined : 'action.hover' }
                                  }}
                                >
-                                  <span style={{ color: '#475569', marginRight: 16, width: 24, textAlign: 'right', display: 'inline-block', userSelect: 'none' }}>{i + 1}</span>
-                                  {/* In Live Mode, this text is invisible but layout must match */}
+                                  <span style={{ color: 'var(--mui-palette-text-disabled)', marginRight: 16, width: 24, textAlign: 'right', display: 'inline-block', userSelect: 'none' }}>{i + 1}</span>
                                   <span style={{ whiteSpace: 'pre' }}>{line || ' '}</span>
                                </Box>
                              );
@@ -601,27 +640,22 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
                             spellCheck={false}
                             style={{
                                 position: 'absolute',
-                                top: 16, // Match padding of parent Box (p=2 -> 16px) + Paper (p=2 -> ??) 
-                                // Actually Paper has p=2. Box has p=2.
-                                // We need exact overlay.
-                                // Easiest: Absolute over the Paper.
+                                top: 16, 
                                 left: 16, right: 16, bottom: 16,
                                 width: 'calc(100% - 32px)',
                                 height: 'auto',
                                 minHeight: '100%',
                                 background: 'transparent',
-                                color: '#e2e8f0',
+                                color: 'var(--foreground)',
                                 border: 'none',
                                 outline: 'none',
                                 resize: 'none',
                                 fontFamily: 'monospace',
                                 fontSize: '14px',
                                 lineHeight: '1.6',
-                                padding: '16px', // Match Paper padding
-                                paddingLeft: '56px', // Logic: 16px (Paper padding) + 16px (Span margin) + 24px (Span width) = 56px?
-                                // Line number area is: px:1 in box + span width 24 + mr 16.
-                                // Box px:1 is 8px.
-                                // Total Left Padding = 16px (Paper) + 8px (Box) + 24px (Width) + 16px (Right Margin) = 64px
+                                padding: '16px',
+                                paddingLeft: '56px',
+                                paddingTop: '22px',
                             }} 
                         />
                     )}
@@ -631,36 +665,27 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
                 {showInput && (
                     <Box 
                         p={2} 
-                        borderTop="1px solid rgba(255,255,255,0.1)" 
-                        bgcolor={waitingForInput ? "rgba(234, 179, 8, 0.1)" : "#1e293b"} // Amber tint when waiting
+                        className="border-t border-border bg-card" 
+                        bgcolor={waitingForInput ? "warning.light" : undefined} // Or subtle yellow
+                        sx={{ bgcolor: waitingForInput ? 'rgba(234, 179, 8, 0.1)' : undefined }}
                         position="relative"
                     >
                          <Box display="flex" justifyContent="space-between" mb={1}>
-                            <Typography variant="caption" color={waitingForInput ? "#facc15" : "gray"} sx={{ display: 'block', letterSpacing: 1, fontWeight: 700 }}>
-                                {waitingForInput ? "⚠️ WAITING FOR USER INPUT (Type below)" : "STANDARD INPUT (Stdin)"}
+                            <Typography variant="caption" color={waitingForInput ? "warning.main" : "text.secondary"} sx={{ display: 'block', letterSpacing: 1, fontWeight: 700 }}>
+                                {waitingForInput ? "⚠️ WAITING FOR USER INPUT" : "STANDARD INPUT (Stdin)"}
                             </Typography>
                             {waitingForInput && (
-                                <Typography variant="caption" sx={{ color: '#facc15',  animation: 'pulse 2s infinite' }}>
+                                <Typography variant="caption" sx={{ color: 'warning.main',  animation: 'pulse 2s infinite' }}>
                                     Program paused at input()
                                 </Typography>
                             )}
                         </Box>
 
                         <textarea 
-                            ref={(input) => {
-                                // Auto-focus if waiting and input is mounted
-                                if (input && waitingForInput) {
-                                    // Prevent fighting with user focus if they are already typing?
-                                    // Only focus if not already focused?
-                                    if (document.activeElement !== input) {
-                                        input.focus(); 
-                                    }
-                                }
-                            }}
                             value={stdIn} 
                             onChange={(e) => handleInputChange(e.target.value)} 
-                            className={`w-full bg-slate-900 text-gray-300 p-2 rounded border font-mono text-sm outline-none transition-colors ${waitingForInput ? 'border-amber-500 ring-1 ring-amber-500/50' : 'border-slate-700 focus:border-blue-500'}`}
-                            placeholder="Type input here (lines are read sequentially)..."
+                            className={`w-full bg-muted text-foreground p-2 rounded border font-mono text-sm outline-none transition-colors ${waitingForInput ? 'border-warning ring-1 ring-warning/50' : 'border-input focus:border-primary'}`}
+                            placeholder="Type input here. If your code detects input(), it will read from here sequentially. For multiple inputs, use separate lines."
                             rows={3}
                         />
                          <style>{`@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }`}</style>
@@ -668,75 +693,68 @@ const PythonVisualizer: React.FC<PythonVisualizerProps> = ({ code, onChangeCode 
                 )}
 
                 {/* STDOUT */}
-                <Box p={2} borderTop="1px solid rgba(255,255,255,0.1)" bgcolor="#020617" minHeight={showInput ? 100 : 120} maxHeight={200} overflow="auto" position="relative">
-                    <Typography variant="caption" color="gray" sx={{ mb: 1, display: 'block', letterSpacing: 1 }}>STANDARD OUTPUT</Typography>
-                    <Box fontFamily="monospace" fontSize="13px" color="#22c55e">
+                <Box p={2} className="border-t border-border bg-background" minHeight={showInput ? 100 : 120} maxHeight={200} overflow="auto" position="relative">
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', letterSpacing: 1 }}>STANDARD OUTPUT</Typography>
+                    <Box fontFamily="monospace" fontSize="13px" className="text-chart-2">
                         {currentData.stdout ? currentData.stdout.split('\n').map((l: string, i: number) => (
                             <div key={i}>{l || <br/>}</div>
-                        )) : <span className="text-gray-700">Waiting for output...</span>}
+                        )) : <span className="text-muted-foreground">Waiting for output...</span>}
                     </Box>
-                    
-                    {/* Waiting Indicator */}
-                    {waitingForInput && (
-                        <div className="absolute top-2 right-2 flex items-center gap-2 bg-amber-500/10 border border-amber-500/50 px-2 py-1 rounded">
-                             <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
-                             <span className="text-xs text-amber-500 font-bold uppercase tracking-wider">Waiting for Input</span>
-                        </div>
-                    )}
                 </Box>
             </Grid>
 
             {/* RIGHT: STACK & HEAP */}
-            <Grid item xs={12} md={5} display="flex" flexDirection="column" bgcolor="#0f172a">
+            <Grid item xs={12} md={5} display="flex" flexDirection="column" className="bg-background" height="100%" overflow="hidden">
                  
                  {/* CALL STACK */}
-                 <Box p={2} borderBottom="1px solid rgba(255,255,255,0.1)" minHeight={150}>
-                      <Typography variant="caption" color="#38bdf8" sx={{ mb: 1, display: 'block', letterSpacing: 1, fontWeight: 700 }}>CALL STACK</Typography>
+                 <Box p={2} className="border-b border-border" minHeight={150}>
+                      <Typography variant="caption" color="primary.main" sx={{ mb: 1, display: 'block', letterSpacing: 1, fontWeight: 700 }}>CALL STACK</Typography>
                       <Box display="flex" flexDirection="column-reverse" gap={1}>
                           {currentData.stack && currentData.stack.map((frame: any, i: number) => (
-                              <Box key={i} bgcolor="rgba(56, 189, 248, 0.1)" p={1} borderRadius={1} border="1px solid rgba(56, 189, 248, 0.2)">
-                                  <Typography variant="body2" color="#e0f2fe" fontWeight={600}>{frame.name}()</Typography>
-                                  <Typography variant="caption" color="#7dd3fc">Line {frame.line}</Typography>
+                              <Box key={i} className="bg-primary/10 border border-primary/20" p={1} borderRadius={1}>
+                                  <Typography variant="body2" color="primary.light" fontWeight={600}>{frame.name}()</Typography>
+                                  <Typography variant="caption" color="primary.main">Line {frame.line}</Typography>
                               </Box>
                           ))}
-                          {(!currentData.stack || currentData.stack.length === 0) && <span className="text-gray-600 text-sm italic">Global Frame</span>}
+                          {(!currentData.stack || currentData.stack.length === 0) && <span className="text-muted-foreground text-sm italic">Global Frame</span>}
                       </Box>
                  </Box>
 
                  {/* LOCALS / HEAP */}
-                 <Box flex={1} overflow="auto" p={2}>
-                      <Typography variant="caption" color="#fcd34d" sx={{ mb: 1, display: 'block', letterSpacing: 1, fontWeight: 700 }}>VARIABLES (HEAP)</Typography>
+                 <Box flex={1} overflow="auto" p={2} sx={{ overflowX: 'hidden' }}>
+                      <Typography variant="caption" className="text-chart-3" sx={{ mb: 1, display: 'block', letterSpacing: 1, fontWeight: 700 }}>VARIABLES (HEAP)</Typography>
                       
                       {currentData.locals && Object.keys(currentData.locals).length > 0 ? (
-                          <div className="flex flex-col gap-3">
+                          <div className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm items-start">
                               {Object.entries(currentData.locals).map(([k, v]) => (
-                                  <div key={k} className="flex flex-col gap-1 bg-slate-800/50 p-2 rounded border border-slate-700">
-                                      <div className="text-xs text-gray-400 font-bold">{k}</div>
-                                      <div className="pl-2">
-                                          {/* Locals might be harder to replace as they are transient. We'll enable it but it might only work for locals defined in the currently visible function scope if we parse correctly. For now we focus on global simple replacement for the user's scenario. */}
+                                  <React.Fragment key={k}>
+                                      <div className="text-muted-foreground font-bold text-xs text-right pt-0.5 select-none">{k}:</div>
+                                      <div className="min-w-0 break-all">
                                           <EditableValue value={v} name={k} onEdit={(newVal) => handleVarEdit(k, newVal)} />
                                       </div>
-                                  </div>
+                                  </React.Fragment>
                               ))}
                           </div>
                       ) : (
-                          <Typography variant="caption" color="gray" fontStyle="italic">No local variables.</Typography>
+                          <Typography variant="caption" color="text.secondary" fontStyle="italic">No local variables.</Typography>
                       )}
 
-                      <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
+                      <Divider sx={{ my: 2, borderColor: 'divider' }} />
 
                        {/* GLOBALS */}
-                      <Typography variant="caption" color="gray" sx={{ mb: 1, display: 'block', letterSpacing: 1 }}>GLOBALS</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', letterSpacing: 1 }}>GLOBALS</Typography>
                       {currentData.globals && Object.keys(currentData.globals).length > 0 ? (
-                           <div className="flex flex-col gap-2">
+                           <div className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm items-start">
                               {Object.entries(currentData.globals).map(([k, v]) => (
-                                  <div key={k} className="flex justify-between items-center text-sm border-b border-slate-800 pb-1">
-                                      <span className="text-slate-400">{k}</span>
-                                      <EditableValue value={v} name={k} onEdit={(newVal) => handleVarEdit(k, newVal)} />
-                                  </div>
+                                  <React.Fragment key={k}>
+                                      <div className="text-muted-foreground font-medium text-xs text-right pt-0.5 select-none">{k}:</div>
+                                      <div className="min-w-0 break-all">
+                                          <EditableValue value={v} name={k} onEdit={(newVal) => handleVarEdit(k, newVal)} />
+                                      </div>
+                                  </React.Fragment>
                               ))}
                            </div>
-                      ) : <span className="text-gray-700 text-xs">Empty</span>}
+                      ) : <span className="text-muted-foreground text-xs">Empty</span>}
                  </Box>
             </Grid>
 

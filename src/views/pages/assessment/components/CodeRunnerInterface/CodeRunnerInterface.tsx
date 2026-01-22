@@ -48,6 +48,9 @@ import {
     ExitToApp as LogoutIcon,
     NetworkCheck,
     SlowMotionVideo,
+  Fullscreen,
+  FullscreenExit,
+  Remove,
     Cancel
 } from "@mui/icons-material";
 import { useRouter } from 'next/navigation';
@@ -206,6 +209,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
     // Visualizer State
     const [showVisualizer, setShowVisualizer] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
     // Navigation placeholders (logic needs to be connected to topicQuestions)
     const [prevQuestionId, setPrevQuestionId] = useState<number | null>(null);
@@ -1312,61 +1316,88 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 </List>
             </Drawer>
 
-            <ThreePaneLayout
-                leftContent={LeftContent}
-                rightTopContent={RightTopContent}
-                rightBottomContent={RightBottomContent}
-                renderLeftHeader={renderLeftHeader}
-                renderRightTopHeader={renderRightTopHeader}
-                renderRightBottomHeader={renderRightBottomHeader}
-                isBottomCollapsed={isBottomCollapsed}
-                onBottomCollapseChange={setIsBottomCollapsed}
-            />
-
-            {/* VISUALIZER DIALOG */}
-            <Dialog
-                open={showVisualizer}
-                onClose={() => setShowVisualizer(false)}
-                maxWidth="xl"
-                fullWidth
-                PaperProps={{
-                    sx: {
-                        height: '85vh',
-                        borderRadius: 3,
-                        bgcolor: '#0f172a', // Dark background for the whole dialog
-                        color: 'white'
-                    }
-                }}
-            >
-                <DialogTitle sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)', // Subtle border
-                    bgcolor: '#1e293b', // Slightly lighter dark for header
-                    px: 3,
-                    py: 2
-                }}>
-                    <Box display="flex" alignItems="center" gap={1.5}>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/10 text-blue-400">
-                            <TerminalIcon fontSize="small" />
-                        </div>
-                        <Typography variant="h6" fontWeight={700} sx={{ letterSpacing: '0.5px' }}>
-                            Code Visualization
-                        </Typography>
-                    </Box>
-                    <IconButton
-                        onClick={() => setShowVisualizer(false)}
+      <ThreePaneLayout
+        leftContent={LeftContent}
+        rightTopContent={RightTopContent}
+        rightBottomContent={RightBottomContent}
+        renderLeftHeader={renderLeftHeader}
+        renderRightTopHeader={renderRightTopHeader}
+        renderRightBottomHeader={renderRightBottomHeader}
+        isBottomCollapsed={isBottomCollapsed}
+        onBottomCollapseChange={setIsBottomCollapsed}
+      />
+      
+    {/* VISUALIZER DIALOG */}
+       <Dialog 
+        open={showVisualizer} 
+        onClose={() => setShowVisualizer(false)}
+        maxWidth="xl"
+        fullWidth
+        fullScreen={isFullScreen}
+        PaperProps={{
+            sx: { 
+              height: isFullScreen ? '100%' : '85vh', 
+              borderRadius: isFullScreen ? 0 : 3,
+              bgcolor: 'background.paper', // White/Theme default
+              color: 'text.primary',
+              overflow: 'hidden' 
+            }
+        }}
+      >
+          <DialogTitle sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper', // White
+            px: 2, 
+            py: 1.5,
+            minHeight: 56
+          }}>
+              <Box display="flex" alignItems="center" gap={1.5}>
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-blue-600">
+                  <TerminalIcon fontSize="small" />
+                </div>
+                <Typography variant="subtitle1" fontWeight={700} sx={{ letterSpacing: '0.2px', color: 'text.primary' }}>
+                  Code Visualization
+                </Typography>
+              </Box>
+              
+              <Box display="flex" alignItems="center" gap={0.5}>
+                  {/* Toggle Full Screen */}
+                  <Tooltip title={isFullScreen ? "Exit Full Screen" : "Full Screen"}>
+                      <IconButton 
+                        onClick={() => setIsFullScreen(!isFullScreen)} 
                         size="small"
-                        sx={{ color: 'rgba(255,255,255,0.7)', '&:hover': { color: 'white', bgcolor: 'rgba(255,255,255,0.1)' } }}
-                    >
-                        <CloseIcon />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent sx={{ p: 0, overflow: 'hidden', height: '100%', bgcolor: '#0f172a' }}>
-                    <PythonVisualizer code={code} onChangeCode={setCode} />
-                </DialogContent>
-            </Dialog>
+                        sx={{ 
+                            color: 'text.secondary', 
+                            '&:hover': { bgcolor: 'action.hover', color: 'text.primary' } 
+                        }}
+                      >
+                          {isFullScreen ? <FullscreenExit fontSize="small" /> : <Fullscreen fontSize="small" />}
+                      </IconButton>
+                  </Tooltip>
+
+                  {/* Close */}
+                  <Tooltip title="Close">
+                      <IconButton 
+                        onClick={() => setShowVisualizer(false)} 
+                        size="small"
+                        sx={{ 
+                            color: 'text.secondary', 
+                            '&:hover': { bgcolor: 'error.50', color: 'error.main' } 
+                        }}
+                      >
+                          <CloseIcon fontSize="small" />
+                      </IconButton>
+                  </Tooltip>
+              </Box>
+          </DialogTitle>
+          <DialogContent sx={{ p: 0, overflow: 'hidden', height: '100%', bgcolor: 'background.default' }}>
+              <PythonVisualizer code={code} onChangeCode={setCode} />
+          </DialogContent>
+      </Dialog>
 
 
             {/* SUBMIT CONFIRMATION DIALOG */}
