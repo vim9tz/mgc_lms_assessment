@@ -124,7 +124,7 @@ export default function ProgrammingPage({ groupedQuestions, userId, isProctoring
     };
 
     try {
-      const res = await fetch("https://compilers.milliongeniuscoders.com/api/execute/", {
+      const res = await fetch("https://dev-compilers.skillryt.com/api/execute/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -215,7 +215,7 @@ export default function ProgrammingPage({ groupedQuestions, userId, isProctoring
     };
 
     try {
-      const res = await fetch('https://compilers.milliongeniuscoders.com/api/execute/', {
+      const res = await fetch('https://dev-compilers.skillryt.com/api/execute/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

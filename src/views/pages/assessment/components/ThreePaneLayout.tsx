@@ -36,6 +36,8 @@ interface ThreePaneLayoutProps {
   renderLeftHeader?: (props: { isMaximized: boolean; isCollapsed: boolean; onMaximize: () => void; onCollapse: () => void }) => React.ReactNode;
   renderRightTopHeader?: (props: { isMaximized: boolean; isCollapsed: boolean; onMaximize: () => void; onCollapse: () => void }) => React.ReactNode;
   renderRightBottomHeader?: (props: { isMaximized: boolean; isCollapsed: boolean; onMaximize: () => void; onCollapse: () => void }) => React.ReactNode;
+  isBottomCollapsed?: boolean;
+  onBottomCollapseChange?: (collapsed: boolean) => void;
 }
 
 const TRANSITION: Transition = { 
@@ -55,11 +57,22 @@ export default function ThreePaneLayout({
   rightBottomTitle = "Output",
   renderLeftHeader,
   renderRightTopHeader,
-  renderRightBottomHeader
+  renderRightBottomHeader,
+  isBottomCollapsed: controlledBottomCollapsed,
+  onBottomCollapseChange
 }: ThreePaneLayoutProps) {
   const [maximizedPanel, setMaximizedPanel] = useState<PaneType>('none');
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
-  const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
+  const [internalBottomCollapsed, setInternalBottomCollapsed] = useState(false);
+
+  const isBottomCollapsed = controlledBottomCollapsed !== undefined ? controlledBottomCollapsed : internalBottomCollapsed;
+  const setIsBottomCollapsed = (collapsed: boolean) => {
+    if (onBottomCollapseChange) {
+      onBottomCollapseChange(collapsed);
+    } else {
+      setInternalBottomCollapsed(collapsed);
+    }
+  };
   const [leftWidth, setLeftWidth] = useState(40);
   const [rightTopHeight, setRightTopHeight] = useState(55);
   const [isResizing, setIsResizing] = useState<'vertical' | 'horizontal' | null>(null);
@@ -120,27 +133,43 @@ export default function ThreePaneLayout({
     }
 
     return (
-      <div className="flex items-center justify-between px-4 h-12 bg-white border-b border-gray-100 select-none shrink-0 overflow-hidden">
-        <div className="flex items-center gap-2 max-w-[70%]">
-          <span className="font-bold text-slate-700 text-xs uppercase tracking-widest truncate">{defaultTitle}</span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
+      <div className={`flex items-center h-12 bg-white border-b border-gray-100 select-none shrink-0 overflow-hidden transition-all duration-300 ${isCollapsed && panel === 'left' ? 'justify-center px-0' : 'justify-between px-4'}`}>
+        {(!isCollapsed || panel !== 'left') && (
+          <div className="flex items-center gap-2 max-w-[70%]">
+            <span className="font-bold text-slate-700 text-[10px] uppercase tracking-widest truncate">
+              {isCollapsed && panel === 'output' ? `Expand ${defaultTitle}` : defaultTitle}
+            </span>
+          </div>
+        )}
+        
+        <div className={`flex items-center gap-1 shrink-0 ${isCollapsed && panel === 'left' ? 'hidden' : ''}`}>
           <button 
             onClick={onMaximize} 
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-all active:scale-95"
+            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-all active:scale-95"
+            title={isMaximized ? "Restore" : "Maximize"}
           >
-            {isMaximized ? <WindowRestoreIcon size={16} /> : <WindowMaximizeIcon size={16} />}
+            {isMaximized ? <WindowRestoreIcon size={14} /> : <WindowMaximizeIcon size={14} />}
           </button>
           {maximizedPanel === 'none' && (
             <button 
               onClick={onCollapse} 
-              className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-all active:scale-95"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-all active:scale-95"
+              title={isCollapsed ? "Expand" : "Collapse"}
             >
               {panel === 'left' && (isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />)}
               {panel === 'output' && (isCollapsed ? <ChevronUp size={18} /> : <ChevronDown size={18} />)}
             </button>
           )}
         </div>
+
+        {isCollapsed && panel === 'left' && (
+          <button 
+            onClick={onCollapse} 
+            className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-all active:scale-95"
+          >
+            <ChevronRight size={18} />
+          </button>
+        )}
       </div>
     );
   };
@@ -206,7 +235,7 @@ export default function ThreePaneLayout({
           width: maximizedPanel === 'none' && !isLeftCollapsed ? '4px' : '0px'
         }}
         onMouseDown={startResize('vertical')}
-        className="bg-transparent hover:bg-indigo-500/10 cursor-col-resize transition-all z-20 shrink-0 flex items-center justify-center group"
+        className="bg-blue-100 hover:bg-indigo-500/10 cursor-col-resize transition-all z-20 shrink-0 flex items-center justify-center group"
       >
         <div className="w-0.5 h-16 bg-slate-200 rounded-full group-hover:bg-indigo-400/50 transition-all group-hover:scale-x-150" />
       </motion.div>
@@ -244,7 +273,7 @@ export default function ThreePaneLayout({
             height: maximizedPanel === 'none' && !isBottomCollapsed ? '4px' : '0px'
           }}
           onMouseDown={startResize('horizontal')}
-          className="bg-transparent hover:bg-indigo-500/10 cursor-row-resize transition-all z-20 flex items-center justify-center group"
+          className="bg-blue-100 hover:bg-indigo-500/10 cursor-row-resize transition-all z-20 flex items-center justify-center group"
         >
           <div className="h-0.5 w-32 bg-slate-200 rounded-full group-hover:bg-indigo-400/50 transition-all group-hover:scale-y-150" />
         </motion.div>
@@ -268,18 +297,21 @@ export default function ThreePaneLayout({
               {rightBottomContent}
             </motion.div>
             
-            {isBottomCollapsed && maximizedPanel === 'none' && (
+            {/* {isBottomCollapsed && maximizedPanel === 'none' && (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 onClick={() => setIsBottomCollapsed(false)} 
-                className="absolute inset-0 top-12 flex items-center px-8 cursor-pointer hover:bg-slate-50 transition-colors gap-8 group"
+                className="absolute inset-x-0 bottom-0 top-0 z-20 flex items-center px-8 cursor-pointer hover:bg-white/90 transition-all gap-8 group backdrop-blur-[2px]"
               >
-                <div className="flex-1 h-1.5 bg-slate-100 rounded-full group-hover:bg-indigo-100 transition-colors" />
-                <div className="text-[10px] font-black text-slate-300 group-hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">Expand {rightBottomTitle}</div>
-                <div className="flex-1 h-1.5 bg-slate-100 rounded-full group-hover:bg-indigo-100 transition-colors" />
+                <div className="flex-1 h-px bg-slate-200 group-hover:bg-indigo-200 transition-colors" />
+                <div className="flex items-center gap-3">
+                   <ChevronUp size={14} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                   <div className="text-[10px] font-black text-slate-400 group-hover:text-indigo-500 uppercase tracking-[0.2em] transition-colors">Expand {rightBottomTitle}</div>
+                </div>
+                <div className="flex-1 h-px bg-slate-200 group-hover:bg-indigo-200 transition-colors" />
               </motion.div>
-            )}
+            )} */}
           </div>
         </motion.div>
       </motion.div>

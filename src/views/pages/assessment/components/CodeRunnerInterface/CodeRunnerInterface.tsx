@@ -148,6 +148,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   // Missing States
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // 0: Output, 1: Tests
+  const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
   const [leftTab, setLeftTab] = useState(0); // 0: Description, 1: Constraints
   
   const [code, setCode] = useState("");
@@ -381,7 +382,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         let executionData: any = null;
         try {
             // Updated compiler URL as per user request
-            const res = await fetch("https://compilers.milliongeniuscoders.com/api/execute/", {
+            const res = await fetch("https://dev-compilers.skillryt.com/api/execute/", {
                 method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(runPayload),
             });
             if (res.ok) executionData = await res.json();
@@ -442,6 +443,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         }
         
         setActiveTab(1); // Switch to results
+        setIsBottomCollapsed(false); // Ensure panel is open
         toast.success("Solution submitted successfully!");
 
       } catch (e: any) {
@@ -459,7 +461,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     try {
       setSubmitting(true);
       setResult(null);
-      setActiveTab(1); // Show Output Tab or Tests Tab
+      setActiveTab(1); // Show Tests Tab
+      setIsBottomCollapsed(false); // Ensure panel is open
 
       const langMap: Record<string, string> = {
         python: "1", java: "2", c: "3", cpp: "4", "c++": "4", javascript: "10", js: "10", node: "10", php: "1"
@@ -489,7 +492,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
       };
 
       // Updated URL
-      const res = await fetch("https://compilers.milliongeniuscoders.com/api/execute/", {
+      const res = await fetch("https://dev-compilers.skillryt.com/api/execute/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -569,7 +572,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   /* ================= RENDER ================= */
 
   const renderLeftHeader = ({ isMaximized, isCollapsed, onMaximize, onCollapse }: any) => (
-      <div className="p-4 pb-0 bg-white z-10 border-b border-gray-100 flex flex-col gap-4">
+      <div className="p-4 pb-0 bg-white z-10 border-b border-zinc-100 flex flex-col gap-4">
              {/* Nav & Title */}
              <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
@@ -589,7 +592,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                       >
                          Questions
                       </Button>
-                      <div className="h-4 w-px bg-gray-300 mx-2" />
+                      <div className="h-4 w-px bg-zinc-300 mx-2" />
                       <div className="flex gap-1">
                         <Tooltip title="Previous Question">
                             <span>
@@ -639,7 +642,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                             Exit
                          </Button>
 
-                         <div className="w-px h-6 bg-gray-200 mx-1" />
+                         <div className="w-px h-6 bg-zinc-300 mx-1" />
 
                         <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
                             <IconButton onClick={onMaximize} size="small">
@@ -677,9 +680,9 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                  </div>
                  
                  {(result?.time_complexity || result?.space_complexity) && (
-                    <div className="flex gap-3 text-xs font-medium text-gray-500">
+                    <div className="flex gap-3 text-xs font-medium text-zinc-500">
                         {result.time_complexity && (
-                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-gray-50 text-gray-600 border border-gray-100">
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-50 text-zinc-600 border border-zinc-100">
                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                                 {result.time_complexity}
                             </span>
@@ -689,17 +692,17 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
              </div>
 
              {/* Modern Tabs (Segmented Control - Squared) */}
-             <div className="bg-gray-100/80 p-1 rounded-lg flex gap-1 mb-2 self-start">
+             <div className="bg-zinc-200/80 p-1 rounded-lg flex gap-1 mb-2 self-start">
                 <button
                     onClick={() => setLeftTab(0)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${leftTab === 0 ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${leftTab === 0 ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/5' : 'text-zinc-500 hover:text-zinc-700'}`}
                 >
                     Description
                 </button>
                 {question.constraints && (
                     <button
                         onClick={() => setLeftTab(1)}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${leftTab === 1 ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${leftTab === 1 ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/5' : 'text-zinc-500 hover:text-zinc-700'}`}
                     >
                         Constraints
                     </button>
@@ -777,7 +780,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     )}
 
                     <div
-                      className="prose prose-slate max-w-none text-slate-600 leading-relaxed font-normal question-content-wrapper prose-headings:text-slate-800 prose-headings:font-bold prose-p:mb-4 prose-code:text-pink-600 prose-code:bg-pink-50 prose-code:px-1 prose-code:rounded prose-code:font-semibold prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-100"
+                      className="prose prose-zinc max-w-none text-zinc-600 leading-relaxed font-normal question-content-wrapper prose-headings:text-zinc-800 prose-headings:font-bold prose-p:mb-4 prose-code:text-pink-600 prose-code:bg-pink-50 prose-code:px-1 prose-code:rounded prose-code:font-semibold prose-pre:bg-zinc-50 prose-pre:border prose-pre:border-zinc-100"
                       dangerouslySetInnerHTML={{ __html: question.content }}
                     />
 
@@ -785,30 +788,30 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     {question.test_cases && question.test_cases.filter((tc: any) => tc.is_public).length > 0 && (
                         <div className="mt-8 space-y-5">
                              <div className="flex items-center gap-2">
-                                <span className="h-px bg-slate-200 flex-1"></span>
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2">Examples</span>
-                                <span className="h-px bg-slate-200 flex-1"></span>
+                                <span className="h-px bg-zinc-300 flex-1"></span>
+                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest px-2">Examples</span>
+                                <span className="h-px bg-zinc-300 flex-1"></span>
                              </div>
                              
                              {question.test_cases.filter((tc: any) => tc.is_public).map((tc: any, i: number) => (
-                                 <div key={i} className="group bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md hover:border-indigo-200 transition-all duration-300">
-                                     <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center group-hover:bg-indigo-50/30 transition-colors">
+                                 <div key={i} className="group bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden hover:shadow-md hover:border-indigo-200 transition-all duration-300">
+                                     <div className="px-4 py-2 border-b border-zinc-100 bg-zinc-50/50 flex justify-between items-center group-hover:bg-indigo-50/30 transition-colors">
                                          <div className="flex items-center gap-2">
-                                             <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-400"></div>
-                                             <span className="text-xs font-bold text-slate-600 group-hover:text-indigo-700">Example {i + 1}</span>
+                                             <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 group-hover:bg-indigo-400"></div>
+                                             <span className="text-xs font-bold text-zinc-600 group-hover:text-indigo-700">Example {i + 1}</span>
                                          </div>
-                                         {tc.description && <span className="text-[10px] text-slate-500 font-medium">{tc.description}</span>}
+                                         {tc.description && <span className="text-[10px] text-zinc-500 font-medium">{tc.description}</span>}
                                      </div>
                                      <div className="p-4 grid gap-4 bg-white">
                                          <div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
-                                                <span className="w-1 h-3 bg-slate-200 rounded-sm"></span>
+                                            <div className="text-[10px] font-bold text-zinc-400 uppercase mb-1.5 flex items-center gap-1">
+                                                <span className="w-1 h-3 bg-zinc-300 rounded-sm"></span>
                                                 Input
                                             </div>
-                                            <code className="block bg-slate-50 border border-slate-100 text-slate-700 rounded-lg p-3 font-mono text-sm overflow-x-auto whitespace-pre leading-relaxed group-hover:border-indigo-100 transition-colors">{tc.input_data}</code>
+                                            <code className="block bg-zinc-50 border border-zinc-100 text-zinc-700 rounded-lg p-3 font-mono text-sm overflow-x-auto whitespace-pre leading-relaxed group-hover:border-indigo-100 transition-colors">{tc.input_data}</code>
                                          </div>
                                          <div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                                            <div className="text-[10px] font-bold text-zinc-400 uppercase mb-1.5 flex items-center gap-1">
                                                 <span className="w-1 h-3 bg-indigo-200 rounded-sm"></span>
                                                 Output
                                             </div>
@@ -842,14 +845,14 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   );
   
   const renderRightTopHeader = ({ isMaximized, onMaximize }: any) => (
-        <div className="h-14 bg-white flex items-center justify-between px-4 shrink-0 z-20">
+        <div className="h-12 bg-white flex items-center justify-between px-4 shrink-0 z-20">
              <div className="flex items-center gap-3">
                  <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
                      <Code2 size={16} strokeWidth={2.5} />
                  </div>
                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-800 leading-none tracking-tight">{question.programming_language || "Code"}</span>
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Editor</span>
+                    <span className="text-sm font-bold text-zinc-800 leading-none tracking-tight">{question.programming_language || "Code"}</span>
+                    {/* <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mt-0.5">Editor</span> */}
                  </div>
              </div>
 
@@ -861,10 +864,10 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     </IconButton>
                  </Tooltip>
 
-                 <div className="w-px h-5 bg-gray-100 mx-1" />
+                 <div className="w-px h-5 bg-zinc-200 mx-1" />
 
                  {/* Action Group */}
-                 <div className="flex items-center p-1 rounded-xl bg-gray-50 border border-gray-100">
+                 <div className="flex items-center rounded-[6px]  border border-zinc-200">
                          <Button
                             variant="text"
                             size="small"
@@ -894,10 +897,10 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                         sx={{ 
                             textTransform: 'none', 
                             fontWeight: 600, 
-                            borderRadius: '8px', 
+                            borderRadius: '6px', 
                             color: 'text.secondary', 
                             minWidth: 'auto',
-                            px: 2,
+                            px: 3,
                             fontSize: '0.8rem',
                             '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' } 
                         }}
@@ -906,7 +909,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                      </Button>
                      {editorLanguage === 'python' && (
                         <>
-                            <div className="w-px h-4 bg-gray-200" />
+                            <div className="w-px h-4 bg-zinc-300" />
                             <Button
                                 variant="text"
                                 size="small"
@@ -915,10 +918,10 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                 sx={{ 
                                     textTransform: 'none', 
                                     fontWeight: 600, 
-                                    borderRadius: '8px', 
+                                    borderRadius: '6px', 
                                     color: 'text.secondary', 
                                     minWidth: 'auto',
-                                    px: 2,
+                                    px: 3,
                                     fontSize: '0.8rem',
                                     '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' } 
                                 }}
@@ -942,11 +945,11 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     sx={{ 
                         textTransform: 'none', 
                         fontWeight: 600, 
-                        borderRadius: '10px', 
+                        borderRadius: '6px', 
                         fontSize: '0.85rem',
-                        px: 2,
-                        py: 0.8,
-                        mr: 1.5,
+                        px: 3,
+                        py: 1.5,
+                        mr: 1,
                         borderColor: '#e0e7ff',
                         color: '#4f46e5',
                         '&:hover': { bgcolor: '#eef2ff', borderColor: '#c7d2fe' }
@@ -965,11 +968,11 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     sx={{ 
                         textTransform: 'none', 
                         fontWeight: 700, 
-                        borderRadius: '10px', 
+                        borderRadius: '6px', 
                         boxShadow: '0 2px 5px rgba(79, 70, 229, 0.2)',
                         fontSize: '0.85rem',
-                        px: 2.5,
-                        py: 0.8,
+                        px: 3,
+                        py: 1.5,
                         background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
                         '&:hover': { boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)', background: 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)' }
                     }}
@@ -1004,25 +1007,25 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   );
 
    const renderRightBottomHeader = ({ isMaximized, isCollapsed, onMaximize, onCollapse }: any) => (
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 h-12 bg-white shrink-0">
-            <div className="flex bg-gray-100/80 p-1 rounded-lg gap-1">
+      <div className="flex items-center justify-between border-b border-zinc-100 px-4 h-12 bg-white shrink-0">
+            <div className="flex bg-zinc-200/80 p-1 rounded-lg gap-1">
                 <button
                     onClick={() => setActiveTab(0)}
-                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 0 ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 0 ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/5' : 'text-zinc-500 hover:text-zinc-700'}`}
                 >
-                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 0 && result?.output ? 'bg-blue-500' : 'bg-gray-400'}`} />
+                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 0 && result?.output ? 'bg-blue-500' : 'bg-zinc-400'}`} />
                         Output
                 </button>
                 <button
                     onClick={() => setActiveTab(1)}
-                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 1 ? 'bg-white text-gray-900 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 1 ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/5' : 'text-zinc-500 hover:text-zinc-700'}`}
                 >
                         {result?.status === 'passed' ? (
                             <CheckCircle2 size={14} className="text-green-500" />
                         ) : result?.status === 'failed' ? (
                             <XCircle size={14} className="text-red-500" />
                         ) : (
-                            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 1 ? 'bg-blue-500' : 'bg-gray-400'}`} />
+                            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 1 ? 'bg-blue-500' : 'bg-zinc-400'}`} />
                         )}
                         Test Results
                 </button>
@@ -1046,21 +1049,21 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   );
 
   const RightBottomContent = (
-      <div className="h-full flex flex-col overflow-hidden p-0 bg-white md:bg-gray-50/30">
+      <div className="h-full flex flex-col overflow-hidden p-0 bg-white md:bg-zinc-50/30">
                {activeTab === 0 && (
                   <div className="p-4 h-full relative overflow-y-auto no-scrollbar">
                       {result?.output ? (
-                          <pre className="font-mono text-sm text-slate-700 whitespace-pre-wrap bg-white border border-gray-200 rounded-lg p-3 shadow-sm min-h-[50px]">
+                          <pre className="font-mono text-sm text-zinc-700 whitespace-pre-wrap bg-white border border-zinc-200 rounded-lg p-3 shadow-sm min-h-[50px]">
                               {result.output}
                           </pre>
                       ) : (
-                          <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3">
-                              <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center">
-                                <Terminal size={24} className="text-gray-300" />
+                          <div className="h-full flex flex-col items-center justify-center text-zinc-400 gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-center">
+                                <Terminal size={24} className="text-zinc-300" />
                               </div>
                               <div className="text-center">
-                                  <p className="text-sm font-semibold text-gray-500">No Output Yet</p>
-                                  <p className="text-xs text-gray-400 mt-1">Run your code to see the execution results here.</p>
+                                  <p className="text-sm font-semibold text-zinc-500">No Output Yet</p>
+                                  <p className="text-xs text-zinc-400 mt-1">Run your code to see the execution results here.</p>
                               </div>
                           </div>
                       )}
@@ -1070,7 +1073,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                {activeTab === 1 && (
                   <div className="p-4 flex flex-col h-full overflow-hidden min-h-0">
                        {/* Summary Header - KEEPING THIS AS IS */}
-                       <div className="flex items-center justify-between mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0">
+                       <div className="flex items-center justify-between mb-4 bg-white p-3 rounded-xl border border-zinc-200 shadow-sm shrink-0">
                            <div className="flex items-center gap-3">
                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${result ? (result.status === 'passed' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600') : 'bg-blue-50 text-blue-600'}`}>
                                    {result ? (
@@ -1086,11 +1089,11 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                        {result ? (result.status === 'passed' ? 'Accepted' : 'Wrong Answer') : (submitting ? 'Running...' : 'Ready to Run')}
                                    </span>
                                    {result ? (
-                                      <span className="text-[10px] text-slate-500 font-medium">
+                                      <span className="text-[10px] text-zinc-500 font-medium">
                                           {result.test_cases?.filter((t: any) => t.status==='passed').length} / {question.test_cases?.length} tests passed
                                       </span>
                                    ) : (
-                                      <span className="text-[10px] text-slate-500 font-medium">
+                                      <span className="text-[10px] text-zinc-500 font-medium">
                                           {question.test_cases?.length} test cases available
                                       </span>
                                    )}
@@ -1098,8 +1101,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                            </div>
                            {result && (
                                <div className="text-right">
-                                   <div className="text-xs font-bold text-slate-700">{result.runtime?.toFixed(0)} ms</div>
-                                   <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Runtime</div>
+                                   <div className="text-xs font-bold text-zinc-700">{result.runtime?.toFixed(0)} ms</div>
+                                   <div className="text-[10px] text-zinc-400 font-medium uppercase tracking-wide">Runtime</div>
                                </div>
                            )}
                        </div>
@@ -1108,11 +1111,11 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                        {result?.test_cases ? (
                            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                                {result.test_cases.filter((_, idx) => question.test_cases?.[idx]?.is_public).map((tc, idx) => (
-                                   <div key={idx} className="group bg-white rounded-lg border border-gray-200 hover:border-indigo-300 transition-all shadow-sm">
+                                   <div key={idx} className="group bg-white rounded-lg border border-zinc-200 hover:border-indigo-300 transition-all shadow-sm">
                                        <div className={`h-1 w-full ${tc.status === 'passed' ? 'bg-green-500' : 'bg-red-500'}`} />
                                        <div className="p-3">
                                            <div className="flex justify-between items-center mb-2">
-                                               <span className="text-xs font-bold text-slate-700">Case {idx + 1}</span>
+                                               <span className="text-xs font-bold text-zinc-700">Case {idx + 1}</span>
                                                <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${tc.status === 'passed' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                                                   {tc.status}
                                                </span>
@@ -1120,19 +1123,19 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                            
                                            {/* Vertical Stack Layout for Input/Exp/Actual */}
                                            {/* Single Line Grid Layout for Input/Exp/Actual */}
-                                           <div className="grid grid-cols-3 gap-2 text-xs font-mono bg-gray-50/50 p-2.5 rounded-md items-center">
+                                           <div className="grid grid-cols-3 gap-2 text-xs font-mono bg-zinc-50/50 p-2.5 rounded-md items-center">
                                                 {/* Input */}
                                                 <Tooltip title={tc.input} arrow placement="top">
                                                     <div className="flex gap-1 overflow-hidden">
-                                                        <span className="text-gray-400 font-bold shrink-0">In:</span>
-                                                        <span className="text-gray-700 truncate">{tc.input}</span>
+                                                        <span className="text-zinc-400 font-bold shrink-0">In:</span>
+                                                        <span className="text-zinc-700 truncate">{tc.input}</span>
                                                     </div>
                                                 </Tooltip>
 
                                                 {/* Expected */}
                                                 <Tooltip title={tc.expected_output} arrow placement="top">
                                                     <div className="flex gap-1 overflow-hidden">
-                                                        <span className="text-gray-400 font-bold shrink-0">Exp:</span>
+                                                        <span className="text-zinc-400 font-bold shrink-0">Exp:</span>
                                                         <span className="text-green-700 truncate">{tc.expected_output}</span>
                                                     </div>
                                                 </Tooltip>
@@ -1159,26 +1162,26 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                        ) : (
                            <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
                                {question.test_cases?.filter((t: any) => t.is_public).map((tc: any, idx: number) => (
-                                  <div key={idx} className="group bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-all shadow-sm">
-                                      <div className="h-1 w-full bg-gray-200 group-hover:bg-blue-200 transition-colors" />
+                                  <div key={idx} className="group bg-white rounded-lg border border-zinc-200 hover:border-blue-300 transition-all shadow-sm">
+                                      <div className="h-1 w-full bg-zinc-300 group-hover:bg-blue-200 transition-colors" />
                                       <div className="p-3">
                                            <div className="flex justify-between items-center mb-2">
-                                               <span className="text-xs font-bold text-slate-700">Case {idx + 1}</span>
-                                               <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                                               <span className="text-xs font-bold text-zinc-700">Case {idx + 1}</span>
+                                               <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-500">
                                                   Waiting
                                                </span>
                                            </div>
-                                           <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-gray-50/50 p-2.5 rounded-md items-center">
+                                           <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-zinc-50/50 p-2.5 rounded-md items-center">
                                                 <Tooltip title={tc.input_data} arrow placement="top">
                                                     <div className="flex gap-1 overflow-hidden">
-                                                        <span className="text-gray-400 font-bold shrink-0">In:</span>
-                                                        <span className="text-gray-700 truncate">{tc.input_data}</span>
+                                                        <span className="text-zinc-400 font-bold shrink-0">In:</span>
+                                                        <span className="text-zinc-700 truncate">{tc.input_data}</span>
                                                     </div>
                                                 </Tooltip>
                                                 <Tooltip title={tc.expected_output} arrow placement="top">
                                                     <div className="flex gap-1 overflow-hidden">
-                                                        <span className="text-gray-400 font-bold shrink-0">Exp:</span>
-                                                        <span className="text-gray-700 truncate">{tc.expected_output}</span>
+                                                        <span className="text-zinc-400 font-bold shrink-0">Exp:</span>
+                                                        <span className="text-zinc-700 truncate">{tc.expected_output}</span>
                                                     </div>
                                                 </Tooltip>
                                            </div>
@@ -1193,7 +1196,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
   );
 
   return (
-    <div className="h-screen bg-gray-50 overflow-hidden font-sans">
+    <div className="h-screen bg-zinc-50 overflow-hidden font-sans">
       
       {/* DRAWER FOR TOPIC TOGGLE */}
       <Drawer
@@ -1213,7 +1216,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
               {!loadingTopicQuestions && topicQuestions.map(q => {
                   const isCurrent = q.id.toString() === currentQuestionId;
                   
-                  let StatusIcon = <div className="w-2.5 h-2.5 rounded-full bg-gray-200" />;
+                  let StatusIcon = <div className="w-2.5 h-2.5 rounded-full bg-zinc-300" />;
                   if (q.status === 'solved') {
                       StatusIcon = <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm" />;
                   } else if (q.status === 'attempted') {
@@ -1269,6 +1272,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         renderLeftHeader={renderLeftHeader}
         renderRightTopHeader={renderRightTopHeader}
         renderRightBottomHeader={renderRightBottomHeader}
+        isBottomCollapsed={isBottomCollapsed}
+        onBottomCollapseChange={setIsBottomCollapsed}
       />
       
     {/* VISUALIZER DIALOG */}
@@ -1366,7 +1371,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                          '&:hover': { 
                             background: 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)', 
                             boxShadow: '0 8px 20px rgba(79, 70, 229, 0.4)',
-                            transform: 'translateY(-1px)'
+                            transform: 'tranzincY(-1px)'
                          },
                          transition: 'all 0.2s ease'
                      }}
@@ -1385,7 +1390,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                          fontWeight: 600, 
                          color: 'text.secondary',
                          height: 48,
-                         '&:hover': { bgcolor: 'gray.50', color: 'text.primary' }
+                         '&:hover': { bgcolor: 'zinc.50', color: 'text.primary' }
                      }}
                    >
                        Cancel
@@ -1424,14 +1429,14 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     <button
                         onClick={handleSaveDraft}
                         disabled={isSaving}
-                        className="group flex items-start gap-4 p-4 rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/30 transition-all text-left w-full outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="group flex items-start gap-4 p-4 rounded-2xl border border-zinc-200 hover:border-blue-400 hover:bg-blue-50/30 transition-all text-left w-full outline-none focus:ring-2 focus:ring-blue-500/20"
                     >
                         <div className="w-10 h-10 rounded-full bg-blue-100/50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-colors">
                             {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                         </div>
                         <div className="flex-1">
-                            <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">Save Draft</h4>
-                            <p className="text-sm text-slate-500 mt-0.5 leading-snug">
+                            <h4 className="font-bold text-zinc-800 group-hover:text-blue-700 transition-colors">Save Draft</h4>
+                            <p className="text-sm text-zinc-500 mt-0.5 leading-snug">
                                 Save your changes and continue working on this question.
                             </p>
                         </div>
@@ -1441,14 +1446,14 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     <button
                         onClick={handleSaveAndExit}
                         disabled={isSaving}
-                        className="group flex items-start gap-4 p-4 rounded-2xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all text-left w-full outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        className="group flex items-start gap-4 p-4 rounded-2xl border border-zinc-200 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all text-left w-full outline-none focus:ring-2 focus:ring-indigo-500/20"
                     >
                         <div className="w-10 h-10 rounded-full bg-indigo-100/50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
                             {isSaving ? <Loader2 size={18} className="animate-spin" /> : <LogOut size={18} />}
                         </div>
                         <div className="flex-1">
-                            <h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">Save & Exit</h4>
-                            <p className="text-sm text-slate-500 mt-0.5 leading-snug">
+                            <h4 className="font-bold text-zinc-800 group-hover:text-indigo-700 transition-colors">Save & Exit</h4>
+                            <p className="text-sm text-zinc-500 mt-0.5 leading-snug">
                                 Save your progress and return to the question list.
                             </p>
                         </div>
@@ -1502,10 +1507,10 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                         height: 48,
                         textTransform: 'none', 
                         fontWeight: 600,
-                        borderColor: 'gray.200',
-                        color: 'gray.700',
+                        borderColor: 'zinc.200',
+                        color: 'zinc.700',
                         fontSize: '1rem',
-                        '&:hover': { borderColor: 'gray.400', bgcolor: 'gray.50' }
+                        '&:hover': { borderColor: 'zinc.400', bgcolor: 'zinc.50' }
                     }}
                    >
                        Cancel
