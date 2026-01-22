@@ -27,5 +27,10 @@ export const codeRunnerApi = {
   saveCode: async (payload: any) => {
     const { data } = await httpClient.post(codeRunnerEndpoints.save, payload);
     return data;
+  },
+
+  resetCode: async (questionId: string) => {
+    const { data } = await httpClient.post(codeRunnerEndpoints.reset, { question_id: questionId });
+    return data;
   }
 };

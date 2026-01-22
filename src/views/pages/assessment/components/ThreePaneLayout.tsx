@@ -215,16 +215,15 @@ export default function ThreePaneLayout({
         
         {/* EDITOR (TOP RIGHT) */}
         <motion.div 
-          layout
           initial={false}
           animate={{
              height: maximizedPanel === 'editor' ? '100%' : (maximizedPanel === 'output' ? '0%' : (isBottomCollapsed ? 'calc(100% - 48px)' : `${rightTopHeight}%`))
           }}
           transition={SMOOTH_TRANSITION}
-          className="flex flex-col bg-white min-h-0 relative z-10 rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+          className="flex flex-col bg-white min-h-0 relative z-10 rounded-xl border border-gray-200 shadow-sm overflow-hidden shrink-0"
         >
            {renderHeader('editor', rightTopTitle, false, () => {}, renderRightTopHeader)}
-           <div className="flex-1 relative overflow-hidden h-full bg-white">{rightTopContent}</div>
+           <div className="flex-1 relative overflow-hidden h-full bg-white flex flex-col">{rightTopContent}</div>
         </motion.div>
 
          {/* RESIZER HORIZONTAL (Editor <-> Output) */}
@@ -239,19 +238,17 @@ export default function ThreePaneLayout({
 
         {/* OUTPUT (BOTTOM RIGHT) */}
         <motion.div 
-           layout
            initial={false}
            animate={{ 
-             flex: (maximizedPanel === 'output') ? '1 1 0%' : (maximizedPanel === 'editor' ? '0 0 auto' : (isBottomCollapsed ? '0 0 auto' : '1 1 0%')),
-             height: (maximizedPanel === 'editor') ? '0px' : 'auto'
+             height: maximizedPanel === 'output' ? '100%' : (maximizedPanel === 'editor' ? '0px' : (isBottomCollapsed ? '48px' : `calc(${100 - rightTopHeight}% - 8px)`))
            }}
            transition={SMOOTH_TRANSITION}
-           className={`bg-white flex flex-col overflow-hidden relative z-0 rounded-xl border border-gray-200 shadow-sm ${isBottomCollapsed && maximizedPanel !== 'output' ? 'h-[48px]' : ''}`}
+           className={`bg-white flex flex-col overflow-hidden relative z-0 rounded-xl border border-gray-200 shadow-sm shrink-0 ${isBottomCollapsed && maximizedPanel !== 'output' ? 'h-[48px]' : ''}`}
         >
            {(!isBottomCollapsed || maximizedPanel === 'output') ? (
              <>
                {renderHeader('output', rightBottomTitle, isBottomCollapsed, () => setIsBottomCollapsed(true), renderRightBottomHeader)}
-               <div className="flex-1 overflow-hidden relative h-full bg-white">{rightBottomContent}</div>
+               <div className="flex-1 overflow-hidden relative h-full bg-white flex flex-col">{rightBottomContent}</div>
              </>
            ) : (
               <div className="flex items-center justify-between px-4 h-full bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => setIsBottomCollapsed(false)}>

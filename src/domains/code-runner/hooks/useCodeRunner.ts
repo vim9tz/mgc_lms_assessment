@@ -115,3 +115,18 @@ export const useSaveCode = () => {
 
     return { mutateAsync, isPending };
 };
+
+export const useResetCode = () => {
+    const [isPending, setIsPending] = useState(false);
+
+    const mutateAsync = async (questionId: string) => {
+        setIsPending(true);
+        try {
+            return await codeRunnerApi.resetCode(questionId);
+        } finally {
+            setIsPending(false);
+        }
+    };
+
+    return { mutateAsync, isPending };
+};

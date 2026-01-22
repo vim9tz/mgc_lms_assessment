@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { signOut } from "next-auth/react";
-import { useCodeRunner, useSaveCode, useSubmitCode } from "@/domains/code-runner/hooks/useCodeRunner";
+import { useCodeRunner, useSaveCode, useSubmitCode, useResetCode } from "@/domains/code-runner/hooks/useCodeRunner";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import {
@@ -51,7 +51,7 @@ import { useRouter } from 'next/navigation';
 import { 
     Maximize2, Minimize2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, 
     LogOut, Play, Code2, Terminal, List as LucideList, X, Loader2, CheckCircle2, XCircle, Eye,
-    Save, FileX
+    Save, FileX, RefreshCw
 } from 'lucide-react';
 
 // Monaco editor (client-only)
@@ -71,8 +71,11 @@ interface QuestionTestCase {
   id: number;
   description?: string;
   input_data: string;
-  expected_output: string;
+  expected_output?: string; // Made optional as it might be null for regex without explicit output
   is_public: boolean;
+  expected_regex?: string;
+  match_mode?: string;
+  regex_flags?: string[];
 }
 
 interface Question {
@@ -89,7 +92,8 @@ interface Question {
   test_cases?: QuestionTestCase[];
   expected_time_complexity?: string;
   expected_space_complexity?: string;
-  submission?: SubmissionResult; // Nested submission data from backend
+  submission?: SubmissionResult;
+  is_regex?: boolean;
 }
 
 interface TopicQuestion {
@@ -158,8 +162,22 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
   const confirmExit = () => {
       setExitDialogOpen(false);
-      router.back();
-      setTimeout(() => router.back(), 100);
+      
+      // If opened in new tab/window, try to close it
+      if (window.opener) {
+          window.close();
+      }
+
+      // "Click two time back" logic
+      // Go back 2 steps to clear any intermediate states (like pre-launch redirects)
+      if (window.history.length > 2) {
+          window.history.go(-2);
+      } else {
+          router.back();
+      }
+      
+      // Fallback just in case
+      setTimeout(() => router.back(), 500);
   };
 
   const handleConfirmSubmit = () => {
@@ -199,6 +217,32 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
   const { mutateAsync: submitCode } = useSubmitCode();
   const { mutateAsync: saveCode, isPending: isSaving } = useSaveCode();
+  const { mutateAsync: resetCode, isPending: isResetting } = useResetCode();
+
+  // Reset Confirmation State
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+
+  const handleReset = async () => {
+    try {
+        if (!question) return;
+
+        await resetCode(question.id.toString());
+        
+        // Reset local state to starter code
+        if (question.starter_code) {
+           setCode(question.starter_code);
+        } else {
+           setCode(""); 
+        }
+        
+        setResult(null); // Clear execution results
+        setResetDialogOpen(false);
+        toast.success("Code reset successfully to starter code.");
+    } catch (error) {
+        console.error("Reset failed:", error);
+        toast.error("Failed to reset code.");
+    }
+  };
 
   // Sync hook state to local state if needed, or replace usage dependent on UI
   // The hook handles fetching active question and topic questions.
@@ -306,11 +350,20 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         };
         const langKey = (question?.programming_language?.toLowerCase() || editorLanguage || "").replace(" language", "");
         const compilerLangId = langMap[langKey] || "1";
+
         const runPayload = {
           code,
           language: compilerLangId,
-          test_cases: question?.test_cases?.map((tc: any) => ({ input: tc.input_data, expected_output: tc.expected_output })) || [],
-          filename: `solution_${Date.now()}`
+          test_cases: question?.test_cases?.map((tc: any) => ({ 
+              input: tc.input_data, 
+              expected_output: tc.expected_output,
+              // Regex support
+              expected_regex: tc.expected_regex,
+              match_mode: tc.match_mode,
+              regex_flags: tc.regex_flags
+          })) || [],
+          filename: `solution_${Date.now()}`,
+          is_regex: question?.is_regex
         };
         
         let executionData: any = null;
@@ -408,9 +461,14 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         language: compilerLangId,
         test_cases: question?.test_cases?.map((tc: any) => ({
             input: tc.input_data,
-            expected_output: tc.expected_output
+            expected_output: tc.expected_output,
+            // Regex support
+            expected_regex: tc.expected_regex,
+            match_mode: tc.match_mode,
+            regex_flags: tc.regex_flags
         })) || [],
-        filename: `solution_${Date.now()}`
+        filename: `solution_${Date.now()}`,
+        is_regex: question?.is_regex
       };
 
       // Updated URL
@@ -781,6 +839,26 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
              <div className="flex items-center gap-3">
                  {/* Action Group */}
                  <div className="flex items-center p-1 rounded-xl bg-gray-50 border border-gray-100">
+                         <Button
+                            variant="text"
+                            size="small"
+                            onClick={() => setResetDialogOpen(true)}
+                            startIcon={isResetting ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                            disabled={isResetting || submitting}
+                            sx={{
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                borderRadius: '8px',
+                                color: 'text.secondary',
+                                minWidth: 'auto',
+                                px: 2,
+                                fontSize: '0.8rem',
+                                '&:hover': { bgcolor: 'white', color: 'error.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
+                            }}
+                         >
+                            Reset
+                         </Button>
+                         <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 1 }} />
                      <Button
                         variant="text"
                         size="small"
@@ -800,25 +878,32 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                      >
                         Run
                      </Button>
-                     <div className="w-px h-4 bg-gray-200" />
-                     <Button
-                        variant="text"
-                        size="small"
-                        onClick={() => setShowVisualizer(true)}
-                        startIcon={<Eye size={15} />}
-                        sx={{ 
-                            textTransform: 'none', 
-                            fontWeight: 600, 
-                            borderRadius: '8px', 
-                            color: 'text.secondary', 
-                            minWidth: 'auto',
-                            px: 2,
-                            fontSize: '0.8rem',
-                            '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' } 
-                        }}
-                     >
-                        Visualizer
-                     </Button>
+                     {editorLanguage === 'python' && (
+                        <>
+                            <div className="w-px h-4 bg-gray-200" />
+                            <Button
+                                variant="text"
+                                size="small"
+                                onClick={() => setShowVisualizer(true)}
+                                startIcon={<Eye size={15} />}
+                                sx={{ 
+                                    textTransform: 'none', 
+                                    fontWeight: 600, 
+                                    borderRadius: '8px', 
+                                    color: 'text.secondary', 
+                                    minWidth: 'auto',
+                                    px: 2,
+                                    fontSize: '0.8rem',
+                                    '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' } 
+                                }}
+                            >
+                                Visualizer
+                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-600 border border-purple-200 uppercase tracking-wide">
+                                    Beta
+                                </span>
+                            </Button>
+                        </>
+                     )}
                  </div>
 
 
@@ -967,20 +1052,26 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                        {/* Summary Header - KEEPING THIS AS IS */}
                        <div className="flex items-center justify-between mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0">
                            <div className="flex items-center gap-3">
-                               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${result ? (result.status === 'passed' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600') : 'bg-gray-100 text-gray-400'}`}>
+                               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${result ? (result.status === 'passed' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600') : 'bg-blue-50 text-blue-600'}`}>
                                    {result ? (
                                       result.status === 'passed' ? <CheckCircle /> : <ErrorIcon />
-                                   ) : (
+                                   ) : submitting ? (
                                       <div className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" /> 
+                                   ) : (
+                                      <PlayArrow />
                                    )}
                                </div>
                                <div className="flex flex-col">
-                                   <span className={`text-sm font-bold ${result ? (result.status === 'passed' ? 'text-green-700' : 'text-red-700') : 'text-gray-500'}`}>
-                                       {result ? (result.status === 'passed' ? 'Accepted' : 'Wrong Answer') : 'Ready to Run'}
+                                   <span className={`text-sm font-bold ${result ? (result.status === 'passed' ? 'text-green-700' : 'text-red-700') : 'text-blue-700'}`}>
+                                       {result ? (result.status === 'passed' ? 'Accepted' : 'Wrong Answer') : (submitting ? 'Running...' : 'Ready to Run')}
                                    </span>
-                                   {result && (
+                                   {result ? (
                                       <span className="text-[10px] text-slate-500 font-medium">
                                           {result.test_cases?.filter((t: any) => t.status==='passed').length} / {question.test_cases?.length} tests passed
+                                      </span>
+                                   ) : (
+                                      <span className="text-[10px] text-slate-500 font-medium">
+                                          {question.test_cases?.length} test cases available
                                       </span>
                                    )}
                                </div>
@@ -995,9 +1086,9 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
                        {/* Test Cases List */}
                        {result?.test_cases ? (
-                           <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar pr-2">
+                           <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                                {result.test_cases.filter((_, idx) => question.test_cases?.[idx]?.is_public).map((tc, idx) => (
-                                   <div key={idx} className="group bg-white rounded-lg border border-gray-200 hover:border-indigo-300 transition-all overflow-hidden shadow-sm">
+                                   <div key={idx} className="group bg-white rounded-lg border border-gray-200 hover:border-indigo-300 transition-all shadow-sm">
                                        <div className={`h-1 w-full ${tc.status === 'passed' ? 'bg-green-500' : 'bg-red-500'}`} />
                                        <div className="p-3">
                                            <div className="flex justify-between items-center mb-2">
@@ -1007,31 +1098,38 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                                </span>
                                            </div>
                                            
-                                           {/* Single Line Layout for Input/Exp/Actual */}
-                                           <div className="flex items-center gap-4 text-xs font-mono bg-gray-50/50 p-2 rounded-md">
+                                           {/* Vertical Stack Layout for Input/Exp/Actual */}
+                                           {/* Single Line Grid Layout for Input/Exp/Actual */}
+                                           <div className="grid grid-cols-3 gap-2 text-xs font-mono bg-gray-50/50 p-2.5 rounded-md items-center">
                                                 {/* Input */}
-                                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                    <span className="text-gray-400 font-bold shrink-0">In:</span>
-                                                    <span className="text-gray-700 truncate" title={tc.input}>{tc.input}</span>
-                                                </div>
-
-                                                <div className="w-px h-3 bg-gray-300 shrink-0" />
+                                                <Tooltip title={tc.input} arrow placement="top">
+                                                    <div className="flex gap-1 overflow-hidden">
+                                                        <span className="text-gray-400 font-bold shrink-0">In:</span>
+                                                        <span className="text-gray-700 truncate">{tc.input}</span>
+                                                    </div>
+                                                </Tooltip>
 
                                                 {/* Expected */}
-                                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                    <span className="text-gray-400 font-bold shrink-0">Exp:</span>
-                                                    <span className="text-green-700 truncate" title={tc.expected_output}>{tc.expected_output}</span>
-                                                </div>
+                                                <Tooltip title={tc.expected_output} arrow placement="top">
+                                                    <div className="flex gap-1 overflow-hidden">
+                                                        <span className="text-gray-400 font-bold shrink-0">Exp:</span>
+                                                        <span className="text-green-700 truncate">{tc.expected_output}</span>
+                                                    </div>
+                                                </Tooltip>
 
-                                                {/* Actual (Only if failed) */}
-                                                {tc.status !== 'passed' && (
-                                                    <>
-                                                        <div className="w-px h-3 bg-red-200 shrink-0" />
-                                                        <div className="flex items-center gap-2 min-w-0 flex-1 bg-red-50 px-1 rounded">
+                                                {/* Actual (Result) */}
+                                                {tc.status !== 'passed' ? (
+                                                    <Tooltip title={tc.actual_output} arrow placement="top">
+                                                        <div className="flex gap-1 overflow-hidden bg-red-50 px-1 rounded border border-red-100">
                                                             <span className="text-red-400 font-bold shrink-0">Got:</span>
-                                                            <span className="text-red-700 truncate font-bold" title={tc.actual_output}>{tc.actual_output}</span>
+                                                            <span className="text-red-700 font-bold truncate">{tc.actual_output}</span>
                                                         </div>
-                                                    </>
+                                                    </Tooltip>
+                                                ) : (
+                                                    <div className="flex gap-1 overflow-hidden items-center text-green-600">
+                                                        <CheckCircle style={{ fontSize: 14 }} />
+                                                        <span className="font-bold">Passed</span>
+                                                    </div>
                                                 )}
                                            </div>
                                        </div>
@@ -1039,13 +1137,31 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                ))}
                            </div>
                        ) : (
-                           <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-2">
-                               {question.test_cases?.filter((t: any) => t.is_public).map((tc: any, i: number) => (
-                                  <div key={i} className="bg-white p-3 rounded-lg border border-gray-200 flex items-center justify-between opacity-70">
-                                      <span className="text-xs font-bold text-gray-500">Case {i + 1}</span>
-                                      <div className="flex gap-2 text-gray-300">
-                                          <div className="w-16 h-2 bg-gray-100 rounded"></div>
-                                          <div className="w-8 h-2 bg-gray-100 rounded"></div>
+                           <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
+                               {question.test_cases?.filter((t: any) => t.is_public).map((tc: any, idx: number) => (
+                                  <div key={idx} className="group bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-all shadow-sm">
+                                      <div className="h-1 w-full bg-gray-200 group-hover:bg-blue-200 transition-colors" />
+                                      <div className="p-3">
+                                           <div className="flex justify-between items-center mb-2">
+                                               <span className="text-xs font-bold text-slate-700">Case {idx + 1}</span>
+                                               <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                                                  Waiting
+                                               </span>
+                                           </div>
+                                           <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-gray-50/50 p-2.5 rounded-md items-center">
+                                                <Tooltip title={tc.input_data} arrow placement="top">
+                                                    <div className="flex gap-1 overflow-hidden">
+                                                        <span className="text-gray-400 font-bold shrink-0">In:</span>
+                                                        <span className="text-gray-700 truncate">{tc.input_data}</span>
+                                                    </div>
+                                                </Tooltip>
+                                                <Tooltip title={tc.expected_output} arrow placement="top">
+                                                    <div className="flex gap-1 overflow-hidden">
+                                                        <span className="text-gray-400 font-bold shrink-0">Exp:</span>
+                                                        <span className="text-gray-700 truncate">{tc.expected_output}</span>
+                                                    </div>
+                                                </Tooltip>
+                                           </div>
                                       </div>
                                   </div> 
                                ))}
@@ -1393,6 +1509,44 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                    </Button>
                </div>
           </div>
+      </Dialog>
+      
+      {/* Reset Confirmation Dialog */}
+      <Dialog
+        open={resetDialogOpen}
+        onClose={() => setResetDialogOpen(false)}
+        PaperProps={{
+            sx: { borderRadius: '12px', padding: '8px' }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <RefreshCw size={20} className="text-orange-500" />
+            Reset to Starter Code?
+        </DialogTitle>
+        <DialogContent>
+            <Typography variant="body2" color="text.secondary">
+                This will permanently delete your current code and revert it to the original starter code. This action cannot be undone.
+            </Typography>
+        </DialogContent>
+        <DialogActions sx={{ padding: '16px' }}>
+            <Button 
+                onClick={() => setResetDialogOpen(false)}
+                variant="outlined"
+                color="inherit"
+                sx={{ textTransform: 'none', borderRadius: '8px' }}
+            >
+                Cancel
+            </Button>
+            <Button 
+                onClick={handleReset} 
+                variant="contained" 
+                color="warning"
+                autoFocus
+                sx={{ textTransform: 'none', borderRadius: '8px', boxShadow: 'none' }}
+            >
+                Yes, Reset Code
+            </Button>
+        </DialogActions>
       </Dialog>
       
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover theme="light" />
