@@ -78,6 +78,11 @@ interface QuestionTestCase {
   expected_regex?: string;
   match_mode?: string;
   regex_flags?: string[];
+  // V2 Fields
+  mode?: 'normal' | 'regex';
+  ignore_space?: boolean;
+  ignore_case?: boolean;
+  numeric_tolerance?: number;
 }
 
 interface Question {
@@ -359,13 +364,18 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
           test_cases: question?.test_cases?.map((tc: any) => ({ 
               input: tc.input_data, 
               expected_output: tc.expected_output,
+              // V2 Fields
+              mode: tc.mode || (question?.is_regex ? 'regex' : 'normal'), // Fallback for old data
+              ignore_space: tc.ignore_space,
+              ignore_case: tc.ignore_case,
+              numeric_tolerance: tc.numeric_tolerance,
+              
               // Regex support
               expected_regex: tc.expected_regex,
               match_mode: tc.match_mode,
               regex_flags: tc.regex_flags
           })) || [],
-          filename: `solution_${Date.now()}`,
-          is_regex: question?.is_regex
+          filename: `solution_${Date.now()}`
         };
         
         let executionData: any = null;
@@ -464,13 +474,18 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         test_cases: question?.test_cases?.map((tc: any) => ({
             input: tc.input_data,
             expected_output: tc.expected_output,
+            // V2 Fields
+            mode: tc.mode || (question?.is_regex ? 'regex' : 'normal'), // Fallback for old data
+            ignore_space: tc.ignore_space,
+            ignore_case: tc.ignore_case,
+            numeric_tolerance: tc.numeric_tolerance,
+
             // Regex support
             expected_regex: tc.expected_regex,
             match_mode: tc.match_mode,
             regex_flags: tc.regex_flags
         })) || [],
-        filename: `solution_${Date.now()}`,
-        is_regex: question?.is_regex
+        filename: `solution_${Date.now()}`
       };
 
       // Updated URL
