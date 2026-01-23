@@ -117,11 +117,20 @@ interface TopicQuestion {
 }
 
 interface TestCaseResult {
-    status: "passed" | "failed" | "error";
+    status?: "passed" | "failed" | "error"; // Made optional to support new API
     input?: string;
     expected_output?: string;
     actual_output?: string;
     passed?: boolean;
+    // New fields based on user JSON
+    error?: string;
+    output?: string;
+    normalized_output?: string;
+    execution_time?: number;
+    name?: string;
+    mode?: string;
+    expected_regex?: string;
+    match_mode?: string;
 }
 
 interface SubmissionResult {
@@ -521,6 +530,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 const original = question?.test_cases?.[i];
                 return {
                     status: r.passed ? "passed" : "failed",
+                    error: r.error,
                     input: original?.input_data || r.input,
                     expected_output: original?.expected_output || r.expected_output,
                     actual_output: r.output
@@ -1149,7 +1159,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                         {result?.test_cases
                             ?.filter((_, idx) => question.test_cases?.[idx]?.is_public)
                             .map((tc, idx) => {
-                                const passed = tc.status === 'passed';
+                                // console.log('Test Case Debug:', { idx, passed: tc.passed, status: tc.status, error: tc.error, tc }); 
+                                const passed = tc.passed ?? tc.status === 'passed';
                                 return (
                                     <Accordion
                                         key={idx}
@@ -1173,7 +1184,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                                 bgcolor: expanded === idx ? 'white' : '#fff',
                                                 borderColor: expanded === idx 
                                                     ? (passed ? '#d1fae5' : '#fee2e2') 
-                                                    : (passed ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)'), // Milder transparent hover border
+                                                    : (passed ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)'),
                                                 boxShadow: expanded !== idx ? '0 2px 8px -2px rgba(0,0,0,0.05)' : undefined
                                             }
                                         }}
@@ -1183,23 +1194,58 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                             sx={{
                                                 minHeight: '48px',
                                                 px: 2,
-                                                '& .MuiAccordionSummary-content': { margin: 0, alignItems: 'center', gap: 2 }
+                                                '& .MuiAccordionSummary-content': { margin: 0, alignItems: 'center', width: 'calc(100% - 24px)' }
                                             }}
                                         >
-                                            {/* Status Dot */}
-                                            <div className={`w-2 h-2 rounded-full shrink-0 ${passed ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]'}`} />
+                                           <div className="flex items-center gap-3 w-full overflow-hidden">
+                                                {/* 1. Icon */}
+                                                {passed ? (
+                                                    <CheckCircle2 className="text-emerald-500 shrink-0" size={18} />
+                                                ) : (
+                                                    <XCircle className="text-rose-500 shrink-0" size={18} />
+                                                )}
 
-                                            <span className={`text-[13px] font-semibold tracking-tight ${expanded === idx ? 'text-zinc-800' : 'text-zinc-600'}`}>
-                                                Test Case {idx + 1}
-                                            </span>
-
-                                            <div className="grow" />
-
-                                            {!passed && (
-                                                <span className="px-1.5 py-0.5 text-[10px] font-bold text-rose-600 bg-rose-50 rounded border border-rose-100 uppercase tracking-wide">
-                                                    Failed
+                                                {/* 2. Test Case Label - Hidden on small screens if overly crowded, but useful context */}
+                                                <span className={`text-[13px] font-semibold tracking-tight whitespace-nowrap shrink-0 ${expanded === idx ? 'text-zinc-800' : 'text-zinc-600'}`}>
+                                                    Case {idx + 1}
                                                 </span>
-                                            )}
+                                                
+                                                <div className="h-4 w-px bg-zinc-200 shrink-0 mx-1" />
+
+                                                {/* 3. Input Summary */}
+                                                <div className="flex items-center gap-2 min-w-0 overflow-hidden relative group shrink-0 max-w-[140px] md:max-w-[200px]">
+                                                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider shrink-0">In:</span>
+                                                    <Tooltip title={tc.input || "No Input"}>
+                                                        <span className="font-mono text-xs text-zinc-600 truncate bg-zinc-50/80 px-1.5 py-0.5 rounded border border-zinc-200/50 w-full cursor-default">
+                                                            {tc.input || <span className="opacity-50 italic">Empty</span>}
+                                                        </span>
+                                                    </Tooltip>
+                                                </div>
+
+                                                {/* 4. Error Summary (Only if Failed) */}
+                                                {/* 4. Status Message (Error or Success) */}
+                                                {/* 4. Status Message (Error or Success) */}
+                                                <div className="h-4 w-px bg-zinc-200 shrink-0 mx-1" />
+                                                <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                                                    {passed ? (
+                                                        <span className="text-xs font-medium text-emerald-600 truncate">
+                                                            Test Case Passed
+                                                        </span>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-[10px] font-bold text-rose-500/70 uppercase tracking-wider shrink-0 hidden sm:block">Err:</span>
+                                                            <Tooltip title={tc.error || "Output mismatch."}>
+                                                                <span className="text-xs truncate font-medium text-rose-600 w-full cursor-help">
+                                                                    {tc.error || "Output mismatch..."}
+                                                                </span>
+                                                            </Tooltip>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* Spacer to push expand icon */}
+                                                <div className="grow" />
+                                           </div>
                                         </AccordionSummary>
 
                                         <AccordionDetails sx={{ p: 0 }}>
@@ -1207,13 +1253,22 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                              <div className="px-4 pb-6 pt-0 flex flex-col gap-3">
                                                 <div className="h-px bg-gradient-to-r from-transparent via-zinc-200 to-transparent w-full" />
                                                 
-                                                {/* Input */}
-                                                <div>
-                                                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1 mb-1 block">Input</span>
-                                                    <div className="bg-zinc-50 border border-zinc-200/60 rounded-md py-2 px-3 font-mono text-xs text-zinc-600">
-                                                        {tc.input}
+                                                {/* Input (Full View - Optional, user implied 'accordiant not open... show input', but if truncated in summary, seeing full here is nicer. Keeping minimal as requested 'then open inside expected output and your output')
+                                                    Status: Removed per strict interpretation of user request to "open inside expected output and your output"
+                                                */}
+
+                                                {/* Error Message (Detailed View) */}
+                                                {!passed && (
+                                                    <div>
+                                                        <span className="text-[10px] font-bold text-rose-600/70 uppercase tracking-widest pl-1 mb-1 block">Error Message</span>
+                                                        <div className="bg-rose-50 border border-rose-100/80 rounded-md py-2 px-3 font-mono text-xs text-rose-700 flex items-start gap-2">
+                                                            <div className="shrink-0 mt-0.5 opacity-70">
+                                                                <XCircle size={14} />
+                                                            </div>
+                                                            <span className="whitespace-pre-wrap break-words leading-relaxed">{tc.error || "Output mismatch."}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )}
 
                                                 {/* Comparison Grid */}
                                                 <div className={`grid gap-3 ${passed ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
@@ -1230,7 +1285,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                                             <span className="text-[10px] font-bold text-rose-600/70 uppercase tracking-widest pl-1 mb-1 block">Your Output</span>
                                                             <div className="bg-white border border-rose-100 rounded-md py-2 px-3 font-mono text-xs text-rose-700 relative overflow-hidden break-words whitespace-pre-wrap">
                                                                 <div className="absolute top-0 left-0 w-1 h-full bg-rose-400/20" />
-                                                                {tc.actual_output}
+                                                                <span className="opacity-90">{tc.actual_output || tc.output}</span>
                                                             </div>
                                                         </div>
                                                     )}
