@@ -522,23 +522,58 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 body: JSON.stringify(payload),
             });
 
-            if (!res.ok) throw new Error("Execution failed");
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || errData.message || errData.detail || "Execution failed");
+            }
 
             const data = await res.json();
 
-            const mappedTestCases: TestCaseResult[] = (data || []).map((r: any, i: number) => {
-                const original = question?.test_cases?.[i];
+            // Check if we have a "Global/Syntax" error that should apply to all cases
+            // Usually execution stops at 1 output if there's a syntax error.
+            const globalErrorCandidate = data?.length === 1 && data[0].error && data[0].error !== 'Output mismatch.' ? data[0].error : null;
+
+            const mappedTestCases: TestCaseResult[] = question?.test_cases?.map((originalTC: any, i: number) => {
+                const r = data?.[i];
+                
+                // If we have a direct result, use it
+                if (r) {
+                    return {
+                        status: r.passed ? "passed" : "failed",
+                        error: r.error,
+                        input: originalTC?.input_data || r.input,
+                        expected_output: originalTC?.expected_output || r.expected_output,
+                        actual_output: r.output
+                    };
+                }
+
+                // If no direct result (e.g. crash prevented this case from running)
                 return {
-                    status: r.passed ? "passed" : "failed",
-                    error: r.error,
-                    input: original?.input_data || r.input,
-                    expected_output: original?.expected_output || r.expected_output,
-                    actual_output: r.output
+                    status: "failed", 
+                    error: "Execution skipped.", // distinct from null/mismatch
+                    input: originalTC?.input_data,
+                    expected_output: originalTC?.expected_output,
+                    actual_output: ""
                 };
-            });
+            }) || [];
 
             const allPassed = mappedTestCases.length > 0 && mappedTestCases.every(tc => tc.status === "passed");
-            const mainOutput = data?.[0]?.output || "";
+            let mainOutput = data?.[0]?.output || "";
+
+            // Heuristic for Execution/Runtime Errors vs Logic Errors
+            // 1. If we have a failed case where the error is NOT "Output mismatch.", it's likely a runtime/syntax error.
+            // Note: We no longer check count mismatch since we normalized the list above.
+            const runtimeErrorCase = mappedTestCases.find(tc => tc.status === 'failed' && tc.error && tc.error !== 'Output mismatch.' && tc.error !== "Execution skipped.");
+            
+            const isExecutionError = !!runtimeErrorCase || !!globalErrorCandidate;
+
+            // If we have a runtime/syntax error, ensure it's in the main Output tab
+            if (globalErrorCandidate) {
+                mainOutput = globalErrorCandidate;
+            } else if (runtimeErrorCase && runtimeErrorCase.error) {
+                 // Fallback if not detected as global but exists
+                mainOutput = runtimeErrorCase.error;
+            }
 
             const timeComplexity = data?.[0]?.time_complexity;
             const spaceComplexity = data?.[0]?.space_complexity;
@@ -547,8 +582,10 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
             const runtime = data?.[0]?.cpuTime ? parseFloat(data[0].cpuTime) * 1000 : 0;
             const memory = data?.[0]?.memory ? parseFloat(data[0].memory) : 0;
 
+            const finalStatus = isExecutionError ? "error" : (allPassed ? "passed" : "failed");
+
             setResult({
-                status: allPassed ? "passed" : "failed",
+                status: finalStatus,
                 runtime,
                 memory,
                 output: mainOutput,
@@ -557,12 +594,20 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 space_complexity: spaceComplexity
             });
 
-        } catch (e) {
+            // If it's a global execution error, show output tab. Otherwise show test results.
+            if (isExecutionError) {
+                setActiveTab(0);
+            } else {
+                setActiveTab(1);
+            }
+
+        } catch (e: any) {
             console.error(e);
             setResult({
                 status: "error",
-                output: "Code execution failed. Please check your connection.",
+                output: e.message || "Code execution failed. Please check your connection.",
             });
+            setActiveTab(0); // Switch to Output tab to show error
         } finally {
             setSubmitting(false);
         }
@@ -1079,7 +1124,11 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
             {activeTab === 0 && (
                 <div className="p-4 h-full relative overflow-y-auto no-scrollbar">
                     {result?.output ? (
-                        <pre className="font-mono text-sm text-zinc-700 whitespace-pre-wrap bg-white border border-zinc-200 rounded-lg p-3 shadow-sm min-h-[50px]">
+                        <pre className={`font-mono text-sm whitespace-pre-wrap border rounded-lg p-3 shadow-sm min-h-[50px] ${
+                            result.status === 'error' 
+                            ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                            : 'bg-white text-zinc-700 border-zinc-200'
+                        }`}>
                             {result.output}
                         </pre>
                     ) : (
