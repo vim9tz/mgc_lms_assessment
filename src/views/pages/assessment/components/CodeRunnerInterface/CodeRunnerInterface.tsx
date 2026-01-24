@@ -203,6 +203,17 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     const [wordWrap, setWordWrap] = useState(true);
     const [autoClosingBrackets, setAutoClosingBrackets] = useState(true);
 
+    const [lastRunCode, setLastRunCode] = useState("");
+    const [runCooldown, setRunCooldown] = useState(0);
+
+    useEffect(() => {
+        let timer: any;
+        if (runCooldown > 0) {
+            timer = setTimeout(() => setRunCooldown(prev => prev - 1), 1000);
+        }
+        return () => clearTimeout(timer);
+    }, [runCooldown]);
+
     const themes = [
         { id: 'vs-dark', name: 'Dark Default', type: 'dark', color: '#1e1e1e' },
         { id: 'vs', name: 'Light Default', type: 'light', color: '#ffffff' },
@@ -521,11 +532,28 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
 
     const handleCodeSubmit = async () => {
+        if (!code.trim()) {
+            toast.error("Submission failed: Editor is empty.", {
+                style: { borderRadius: '12px', fontWeight: 700 }
+            });
+            return;
+        }
+
+        if (code === lastRunCode) {
+            toast.error("Submission failed: No modifications detected.", {
+                style: { borderRadius: '12px', fontWeight: 700, border: '1px solid #fee2e2' }
+            });
+            return;
+        }
+
+        if (runCooldown > 0) {
+            toast.warning(`Cooling down... Wait ${runCooldown}s`);
+            return;
+        }
+
         try {
             setSubmitting(true);
 
-            // --- RUN LOGIC (EXECUTE ON COMPILER FIRST) ---
-            // keeping this direct as requested (only refactoring microcollege api)
             const langMap: Record<string, string> = {
                 python: "1", java: "2", c: "3", cpp: "4", "c++": "4", javascript: "10", js: "10", node: "10", php: "1"
             };
@@ -538,13 +566,10 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 test_cases: question?.test_cases?.map((tc: any) => ({
                     input: tc.input_data,
                     expected_output: tc.expected_output,
-                    // V2 Fields
-                    mode: tc.mode || (question?.is_regex ? 'regex' : 'normal'), // Fallback for old data
+                    mode: tc.mode || (question?.is_regex ? 'regex' : 'normal'),
                     ignore_space: tc.ignore_space,
                     ignore_case: tc.ignore_case,
                     numeric_tolerance: tc.numeric_tolerance,
-
-                    // Regex support
                     expected_regex: tc.expected_regex,
                     match_mode: tc.match_mode,
                     regex_flags: tc.regex_flags
@@ -552,35 +577,61 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 filename: `solution_${Date.now()}`
             };
 
-            let executionData: any = null;
-            try {
-                // Updated compiler URL as per user request
-                const res = await fetch("https://dev-compilers.skillryt.com/api/execute/", {
-                    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(runPayload),
-                });
-                if (res.ok) executionData = await res.json();
-            } catch (e) {
-                console.error("Exec failed during submit", e);
-            }
-
-            const mappedTestCases = (executionData || []).map((r: any, i: number) => {
-                const original = question?.test_cases?.[i];
-                return {
-                    status: r.passed ? "passed" : "failed",
-                    input: original?.input_data || r?.input || '',
-                    expected_output: original?.expected_output || r?.expected_output || '',
-                    actual_output: r?.output || r?.actual_output || ''
-                };
+            // 1. Execute Code
+            const res = await fetch("https://dev-compilers.skillryt.com/api/execute/", {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(runPayload),
             });
 
-            const allPassed = mappedTestCases.length > 0 && mappedTestCases.every((tc: any) => tc.status === "passed");
-            const mainOutput = executionData?.[0]?.output || "Submission Executed";
+            // Apply cooldown and tracking immediately after primary API call
+            setRunCooldown(5);
+            setLastRunCode(code);
 
-            // Extract Complexity
-            const timeComplexity = executionData?.[0]?.time_complexity;
-            const spaceComplexity = executionData?.[0]?.space_complexity;
-            const runtime = executionData?.[0]?.cpuTime ? parseFloat(executionData[0].cpuTime) * 1000 : 0; // Convert s to ms if needed, check API
-            const memory = executionData?.[0]?.memory ? parseFloat(executionData[0].memory) : 0; // KB usually
+            if (res.status === 422) {
+                const errData = await res.json().catch(() => ({}));
+                setResult({
+                    status: "error",
+                    output: errData.error || errData.message || "Runtime Error",
+                    test_cases: []
+                });
+                setActiveTab(0);
+                return;
+            }
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || errData.message || "Execution failed");
+            }
+
+            const executionData = await res.json();
+
+            // Index 0: Global Execution Result
+            const globalResult = executionData?.[0];
+            const mainOutput = globalResult?.output || "Executed";
+
+            // Index 1+: Test Case Results
+            const mappedTestCases = question?.test_cases?.map((originalTC: any, i: number) => {
+                const r = executionData?.[i + 1];
+                if (r) {
+                    return {
+                        status: r.passed ? "passed" : "failed",
+                        error: r.error,
+                        input: originalTC?.input_data || r.input,
+                        expected_output: originalTC?.expected_output || r.expected_output,
+                        actual_output: r.output
+                    };
+                }
+                return {
+                    status: "failed",
+                    error: "Execution skipped.",
+                    input: originalTC?.input_data,
+                    expected_output: originalTC?.expected_output,
+                    actual_output: ""
+                };
+            }) || [];
+
+            const allPassed = mappedTestCases.length > 0 && mappedTestCases.every((tc: any) => tc.status === "passed");
+            const runtime = globalResult?.cpuTime ? parseFloat(globalResult.cpuTime) * 1000 : 0;
+            const memory = globalResult?.memory ? parseFloat(globalResult.memory) : 0;
 
             setResult({
                 status: allPassed ? "passed" : "failed",
@@ -588,41 +639,42 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 runtime: runtime,
                 memory: memory,
                 test_cases: mappedTestCases,
-                time_complexity: timeComplexity,
-                space_complexity: spaceComplexity
+                time_complexity: globalResult?.time_complexity,
+                space_complexity: globalResult?.space_complexity
             });
 
-            // 2. Submit to Backend using HOOK
+            // 2. Submit to Backend
             const backendPayload = {
                 question_id: currentQuestionId,
                 code,
                 language_id: languageId,
                 execution_results: {
                     output: mainOutput,
+                    status: allPassed ? "passed" : "failed",
                     test_cases: mappedTestCases.map((tc: any) => ({
                         passed: tc.status === 'passed',
                         output: tc.actual_output,
                     })),
-                    time_complexity: timeComplexity,
-                    space_complexity: spaceComplexity
+                    time_complexity: globalResult?.time_complexity,
+                    space_complexity: globalResult?.space_complexity
                 }
             };
 
-            const submitData = await submitCode(backendPayload);
+            await submitCode(backendPayload);
 
-            // Refresh topic questions to update 'solved' status if passed
             if (allPassed && question?.topic_id) {
                 fetchTopicQuestions(question.topic_id);
             }
 
-            setActiveTab(1); // Switch to results
-            setIsBottomCollapsed(false); // Ensure panel is open
+            setActiveTab(1);
+            setIsBottomCollapsed(false);
             toast.success("Solution submitted successfully!");
 
         } catch (e: any) {
             console.error(e);
+            setRunCooldown(5); // Cooldown applies even on network errors
             setResult({ status: "error", output: e.message || "Submission failed. Please try again." });
-            toast.error("Submission failed. Please try again.");
+            toast.error(e.message || "Submission failed. Please try again.");
         } finally {
             setSubmitting(false);
         }
@@ -631,6 +683,27 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     /* ================= RUN CODE (FRONTEND) ================= */
 
     const handleCodeRun = async () => {
+        if (!code.trim()) {
+            toast.error("Editor is empty! Please write some code before running.", {
+                style: { borderRadius: '12px', fontWeight: 700 }
+            });
+            return;
+        }
+
+        if (runCooldown > 0) {
+            toast.warning(`Cooling down... Wait ${runCooldown}s`, {
+                style: { borderRadius: '12px', fontWeight: 700 }
+            });
+            return;
+        }
+
+        if (code === lastRunCode) {
+            toast.error("Execution failed: No modifications detected.", {
+                style: { borderRadius: '12px', fontWeight: 700, border: '1px solid #fee2e2' }
+            });
+            return;
+        }
+
         try {
             setSubmitting(true);
             setResult(null);
@@ -671,6 +744,22 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 body: JSON.stringify(payload),
             });
 
+            // Set cooldown and last run code even on failure
+            setRunCooldown(5);
+            setLastRunCode(code);
+
+            // Handle Status 422 (Runtime Errors)
+            if (res.status === 422) {
+                const errData = await res.json().catch(() => ({}));
+                setResult({
+                    status: "error",
+                    output: errData.error || errData.message || "Runtime Error",
+                    test_cases: [] // Do not show test cases for runtime errors
+                });
+                setActiveTab(0);
+                return;
+            }
+
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
                 throw new Error(errData.error || errData.message || errData.detail || "Execution failed");
@@ -678,14 +767,13 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
             const data = await res.json();
 
-            // Check if we have a "Global/Syntax" error that should apply to all cases
-            // Usually execution stops at 1 output if there's a syntax error.
-            const globalErrorCandidate = data?.length === 1 && data[0].error && data[0].error !== 'Output mismatch.' ? data[0].error : null;
+            // Index 0 is Global Execution Info
+            const globalResult = data?.[0];
+            const globalError = globalResult?.passed === false ? globalResult.error : null;
 
             const mappedTestCases: TestCaseResult[] = question?.test_cases?.map((originalTC: any, i: number) => {
-                const r = data?.[i];
+                const r = data?.[i + 1]; // Offset by 1
                 
-                // If we have a direct result, use it
                 if (r) {
                     return {
                         status: r.passed ? "passed" : "failed",
@@ -696,10 +784,9 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     };
                 }
 
-                // If no direct result (e.g. crash prevented this case from running)
                 return {
                     status: "failed", 
-                    error: "Execution skipped.", // distinct from null/mismatch
+                    error: "Execution skipped.",
                     input: originalTC?.input_data,
                     expected_output: originalTC?.expected_output,
                     actual_output: ""
@@ -707,31 +794,19 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
             }) || [];
 
             const allPassed = mappedTestCases.length > 0 && mappedTestCases.every(tc => tc.status === "passed");
-            let mainOutput = data?.[0]?.output || "";
+            let mainOutput = globalResult?.output || "";
 
-            // Heuristic for Execution/Runtime Errors vs Logic Errors
-            // 1. If we have a failed case where the error is NOT "Output mismatch.", it's likely a runtime/syntax error.
-            // Note: We no longer check count mismatch since we normalized the list above.
-            const runtimeErrorCase = mappedTestCases.find(tc => tc.status === 'failed' && tc.error && tc.error !== 'Output mismatch.' && tc.error !== "Execution skipped.");
-            
-            const isExecutionError = !!runtimeErrorCase || !!globalErrorCandidate;
-
-            // If we have a runtime/syntax error, ensure it's in the main Output tab
-            if (globalErrorCandidate) {
-                mainOutput = globalErrorCandidate;
-            } else if (runtimeErrorCase && runtimeErrorCase.error) {
-                 // Fallback if not detected as global but exists
-                mainOutput = runtimeErrorCase.error;
+            // Use global error if present, otherwise main output
+            if (globalError) {
+                mainOutput = globalError;
             }
 
-            const timeComplexity = data?.[0]?.time_complexity;
-            const spaceComplexity = data?.[0]?.space_complexity;
-            // API typically returns cpuTime (seconds) and memory (KB)
-            // We'll treat cpuTime as seconds and display as ms
-            const runtime = data?.[0]?.cpuTime ? parseFloat(data[0].cpuTime) * 1000 : 0;
-            const memory = data?.[0]?.memory ? parseFloat(data[0].memory) : 0;
+            const timeComplexity = globalResult?.time_complexity;
+            const spaceComplexity = globalResult?.space_complexity;
+            const runtime = globalResult?.cpuTime ? parseFloat(globalResult.cpuTime) * 1000 : 0;
+            const memory = globalResult?.memory ? parseFloat(globalResult.memory) : 0;
 
-            const finalStatus = isExecutionError ? "error" : (allPassed ? "passed" : "failed");
+            const finalStatus = globalError ? "error" : (allPassed ? "passed" : "failed");
 
             setResult({
                 status: finalStatus,
@@ -743,8 +818,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 space_complexity: spaceComplexity
             });
 
-            // If it's a global execution error, show output tab. Otherwise show test results.
-            if (isExecutionError) {
+            // If it's a runtime/global error, show output tab.
+            if (globalError) {
                 setActiveTab(0);
             } else {
                 setActiveTab(1);
@@ -752,6 +827,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
         } catch (e: any) {
             console.error(e);
+            // Even if execution fails globally, trigger cooldown to prevent spamming failed requests
+            setRunCooldown(5);
             setResult({
                 status: "error",
                 output: e.message || "Code execution failed. Please check your connection.",
@@ -1157,26 +1234,80 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     
                     <div className="w-px h-4 bg-zinc-200 mx-0.5" />
                     
-                    <Tooltip title="Run Code">
-                        <Button
-                            variant="text"
-                            size="small"
-                            disabled={submitting}
-                            onClick={handleCodeRun}
-                            sx={{
-                                textTransform: 'none',
-                                fontWeight: 600,
-                                borderRadius: '6px',
-                                color: 'text.secondary',
-                                minWidth: '32px',
-                                px: { xs: 1, sm: 2 },
-                                height: 32, 
-                                '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
-                            }}
-                        >
-                             {submitting ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} className="fill-current" />}
-                             <span className="hidden sm:inline ml-2 text-xs">Run</span>
-                        </Button>
+                    <Tooltip 
+                        title={
+                            runCooldown > 0 
+                                ? `Run is cooling down. Please wait ${runCooldown} seconds...` 
+                                : (code === lastRunCode ? "No modifications detected since last run." : "Run Code (Ctrl + Enter)")
+                        }
+                    >
+                        <span>
+                            <Button
+                                variant="text"
+                                size="small"
+                                disabled={submitting || runCooldown > 0}
+                                onClick={handleCodeRun}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontWeight: 800,
+                                    borderRadius: '8px',
+                                    color: runCooldown > 0 ? '#71717a' : (code === lastRunCode ? '#a1a1aa' : '#4f46e5'),
+                                    minWidth: '42px',
+                                    px: { xs: 1.5, sm: 2.5 },
+                                    height: 32, 
+                                    bgcolor: runCooldown > 0 ? '#f4f4f5' : (code === lastRunCode ? 'transparent' : 'rgba(79, 70, 229, 0.08)'),
+                                    border: '1px solid',
+                                    borderColor: runCooldown > 0 ? '#e4e4e7' : (code === lastRunCode ? 'transparent' : 'rgba(79, 70, 229, 0.15)'),
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    '&:hover': { 
+                                        bgcolor: '#4f46e5', 
+                                        color: 'primary.main', 
+                                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.35)',
+                                        borderColor: '#4f46e5'
+                                    },
+                                    '&:disabled': {
+                                        color: runCooldown > 0 ? '#71717a' : (code === lastRunCode ? '#a1a1aa' : '#71717a'),
+                                        bgcolor: runCooldown > 0 ? '#f4f4f5' : 'transparent',
+                                        borderColor: runCooldown > 0 ? '#e4e4e7' : 'transparent',
+                                    }
+                                }}
+                            >
+                                <AnimatePresence mode="wait">
+                                    {submitting ? (
+                                        <motion.div
+                                            key="submitting"
+                                            initial={{ opacity: 0, rotate: -90 }}
+                                            animate={{ opacity: 1, rotate: 0 }}
+                                            exit={{ opacity: 0, scale: 0.5 }}
+                                        >
+                                            <Loader2 size={14} className="animate-spin" />
+                                        </motion.div>
+                                    ) : runCooldown > 0 ? (
+                                        <motion.div
+                                            key="cooldown"
+                                            initial={{ opacity: 0, y: 5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -5 }}
+                                            className="flex items-center gap-1.5"
+                                        >
+                                            <div className="w-3.5 h-3.5 rounded-full border-2 border-zinc-300 border-t-zinc-800 animate-spin" />
+                                            <span className="text-[11px] font-black tabular-nums text-zinc-900">{runCooldown}s</span>
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div
+                                            key="ready"
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 1.2 }}
+                                            className="flex items-center gap-2"
+                                        >
+                                            <Play size={14} className="fill-current" />
+                                            <span className="hidden sm:inline text-xs">Run</span>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </Button>
+                        </span>
                     </Tooltip>
 
                     {editorLanguage === 'python' && (
@@ -1396,7 +1527,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                 )}
                                 <span>
                                     {result ? (
-                                        result.status === 'passed' ? 'All Passed' : 'Test Failed'
+                                        result.status === 'passed' ? 'All Passed' : (result.test_cases?.length === 0 ? 'Runtime Error' : 'Error')
                                     ) : (
                                         submitting ? 'Running...' : 'Ready'
                                     )}
@@ -1406,14 +1537,17 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                             {/* Divider */}
                             <div className="h-4 w-px bg-zinc-200" />
 
-                            {/* Counts */}
                             <span className="text-xs font-medium text-zinc-500">
                                 {result ? (
-                                    <span className={result.status === 'passed' ? 'text-emerald-600' : 'text-zinc-600'}>
-                                        {result.test_cases?.filter((t: any) => t.status === 'passed').length}
-                                        <span className="text-zinc-400 mx-1">/</span>
-                                        {question.test_cases?.length} passed
-                                    </span>
+                                    result.status === 'error' || result.test_cases?.length === 0 ? (
+                                        <span className="text-rose-600 font-bold uppercase tracking-tight">Execution Failed</span>
+                                    ) : (
+                                        <span className={result.status === 'passed' ? 'text-emerald-600' : 'text-rose-600 font-bold'}>
+                                            {result.test_cases?.filter((t: any) => t.status === 'passed').length}
+                                            <span className="text-zinc-400 mx-1">/</span>
+                                            {question.test_cases?.length} passed
+                                        </span>
+                                    )
                                 ) : (
                                     <span>{question.test_cases?.length} cases loaded</span>
                                 )}
@@ -1433,6 +1567,15 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                         {/* Clean Minimalist Test Cases */}
+                        {result?.test_cases?.length === 0 && result.status === 'error' && (
+                            <div className="flex flex-col items-center justify-center h-full text-zinc-400 gap-3 py-10">
+                                <ErrorIcon sx={{ fontSize: 48, opacity: 0.2 }} />
+                                <div className="text-center">
+                                    <p className="text-sm font-semibold text-rose-500">Runtime Error</p>
+                                    <p className="text-xs text-zinc-400 mt-1 max-w-[200px]">The code could not be executed properly. Check the Output tab for details.</p>
+                                </div>
+                            </div>
+                        )}
                         {result?.test_cases
                             ?.filter((_, idx) => question.test_cases?.[idx]?.is_public)
                             .map((tc, idx) => {
@@ -1548,7 +1691,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                                 )}
 
                                                 {/* Comparison Grid */}
-                                                <div className={`grid gap-3 ${passed ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+                                                <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
                                                     <div className="min-w-0">
                                                         <span className="text-[10px] font-bold text-emerald-600/70 uppercase tracking-widest pl-1 mb-1 block">Expected Output</span>
                                                         <div className="bg-white border border-emerald-100 rounded-md py-2 px-3 font-mono text-xs text-zinc-700 relative overflow-hidden break-words whitespace-pre-wrap">
@@ -1557,15 +1700,13 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                                         </div>
                                                     </div>
 
-                                                    {!passed && (
-                                                        <div className="min-w-0">
-                                                            <span className="text-[10px] font-bold text-rose-600/70 uppercase tracking-widest pl-1 mb-1 block">Your Output</span>
-                                                            <div className="bg-white border border-rose-100 rounded-md py-2 px-3 font-mono text-xs text-rose-700 relative overflow-hidden break-words whitespace-pre-wrap">
-                                                                <div className="absolute top-0 left-0 w-1 h-full bg-rose-400/20" />
-                                                                <span className="opacity-90">{tc.actual_output || tc.output}</span>
-                                                            </div>
+                                                    <div className="min-w-0">
+                                                        <span className={`text-[10px] font-bold ${passed ? 'text-emerald-600/70' : 'text-rose-600/70'} uppercase tracking-widest pl-1 mb-1 block`}>Your Output</span>
+                                                        <div className={`bg-white border ${passed ? 'border-emerald-100' : 'border-rose-100'} rounded-md py-2 px-3 font-mono text-xs ${passed ? 'text-zinc-700' : 'text-rose-700'} relative overflow-hidden break-words whitespace-pre-wrap`}>
+                                                            <div className={`absolute top-0 left-0 w-1 h-full ${passed ? 'bg-emerald-400/20' : 'bg-rose-400/20'}`} />
+                                                            <span className="opacity-90">{tc.actual_output || tc.output}</span>
                                                         </div>
-                                                    )}
+                                                    </div>
                                                 </div>
                                              </div>
                                         </AccordionDetails>
