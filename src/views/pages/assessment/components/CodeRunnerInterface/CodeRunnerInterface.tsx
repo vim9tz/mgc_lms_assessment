@@ -330,8 +330,13 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
 
     // Handle Save Draft
-    // Handle Save Draft
     const handleSaveDraft = async () => {
+        // Validate empty code
+        if (!code || !code.trim()) {
+            toast.warn("No code inside! Please write something before saving.");
+            return;
+        }
+
         try {
             if (!question) return;
 
@@ -340,6 +345,11 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 code: code,
                 language_id: question.programming_language_id || 1
             });
+
+            // Update sidebar status instantly
+            if (question.topic_id) {
+                fetchTopicQuestions(question.topic_id);
+            }
 
             setSaveDialogOpen(false);
             toast.success("Draft saved successfully!");
@@ -351,6 +361,12 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
     // Handle Save & Exit
     const handleSaveAndExit = async () => {
+        // Validate empty code
+        if (!code || !code.trim()) {
+            toast.warn("No code inside! Please write something before saving.");
+            return;
+        }
+
         try {
             if (!question) return;
 
@@ -642,36 +658,42 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     /* ================= RENDER ================= */
 
     const renderLeftHeader = ({ isMaximized, isCollapsed, onMaximize, onCollapse }: any) => (
-        <div className="p-4 pb-0 bg-white z-10 border-b border-zinc-100 flex flex-col gap-4">
-            {/* Nav & Title */}
-            <div className="flex justify-between items-start">
+        <div className="bg-white z-10 border-b border-zinc-200 flex flex-col">
+            {/* Top Navigation Bar */}
+            <div className="h-12 flex items-center justify-between px-4 border-b border-zinc-200 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
+                
+                {/* Left: Questions & Nav */}
+                {/* Left: Questions & Nav */}
                 <div className="flex items-center gap-2">
-                    <Button
-                        startIcon={<LucideList size={18} />}
-                        variant="text"
-                        size="small"
-                        onClick={() => setDrawerOpen(true)}
-                        sx={{
-                            color: 'text.secondary',
-                            textTransform: 'none',
-                            fontSize: '0.85rem',
-                            minWidth: 'auto',
-                            px: 1,
-                            '&:hover': { bgcolor: 'grey.50', color: 'text.primary' }
-                        }}
-                    >
-                        Questions
-                    </Button>
-                    <div className="h-4 w-px bg-zinc-300 mx-2" />
-                    <div className="flex gap-1">
+                    <Tooltip title="Topic Questions">
+                        <button
+                            onClick={() => setDrawerOpen(true)}
+                            className="flex items-center gap-2 pl-2 pr-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 transition-all group"
+                        >
+                            <div className="w-6 h-6 rounded-md bg-white text-slate-700 flex items-center justify-center shadow-sm">
+                                <LucideList size={13} strokeWidth={2.5} />
+                            </div>
+                            <span className="text-xs font-bold text-slate-700">Questions</span>
+                        </button>
+                    </Tooltip>
+
+                    <div className="h-4 w-px bg-zinc-200 mx-1" />
+
+                    <div className="flex items-center bg-zinc-50 rounded-lg p-0.5 border border-zinc-100">
                         <Tooltip title="Previous Question">
                             <span>
                                 <IconButton
                                     disabled={!prevQuestionId}
                                     onClick={() => prevQuestionId && handleSwitchQuestion(prevQuestionId)}
                                     size="small"
+                                    sx={{ 
+                                        borderRadius: '6px',
+                                        width: 24,
+                                        height: 24,
+                                        '&:hover': { bgcolor: 'white', shadow: 'sm', color: 'primary.main' }
+                                    }}
                                 >
-                                    <ChevronLeft size={18} />
+                                    <ChevronLeft size={16} />
                                 </IconButton>
                             </span>
                         </Tooltip>
@@ -681,80 +703,119 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                                     disabled={!nextQuestionId}
                                     onClick={() => nextQuestionId && handleSwitchQuestion(nextQuestionId)}
                                     size="small"
+                                    sx={{ 
+                                        borderRadius: '6px',
+                                        width: 24,
+                                        height: 24,
+                                        '&:hover': { bgcolor: 'white', shadow: 'sm', color: 'primary.main' }
+                                    }}
                                 >
-                                    <ChevronRight size={18} />
+                                    <ChevronRight size={16} />
                                 </IconButton>
                             </span>
                         </Tooltip>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    {/* EXIT BUTTON */}
+                {/* Right: Actions */}
+                <div className="flex items-center gap-3">
                     <Button
                         onClick={handleExit}
                         variant="outlined"
-                        color="inherit"
                         size="small"
-                        startIcon={<LogOut size={16} />}
                         sx={{
                             textTransform: 'none',
                             fontWeight: 600,
                             borderRadius: '8px',
                             color: 'text.secondary',
-                            borderColor: 'divider',
+                            borderColor: '#e2e8f0', // slate-200
                             fontSize: '0.8rem',
+                            minWidth: 'auto',
                             height: 32,
-                            minWidth: 80,
-                            '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.300', color: 'error.main' }
+                            px: 1.5,
+                            transition: 'all 0.2s',
+                            '&:hover': { 
+                                bgcolor: '#ff000082', 
+                                color: '#ef4444', // red-500
+                                borderColor: 'transparent',
+                                boxShadow: 'inset 0 0 0 1px #fee2e2' // subtle danger ring instead of hard border
+                            }
                         }}
                     >
+                        <LogOut size={14} className="mr-1.5" />
                         Exit
                     </Button>
 
-                    <div className="w-px h-6 bg-zinc-300 mx-1" />
+                    <div className="w-px h-4 bg-zinc-200" />
 
-                    <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
-                        <IconButton onClick={onMaximize} size="small">
-                            {isMaximized ? <WindowRestoreIcon size={16} /> : <WindowMaximizeIcon size={16} />}
-                        </IconButton>
-                    </Tooltip>
-                    {!isMaximized && (
-                        <Tooltip title="Collapse">
-                            <IconButton onClick={onCollapse} size="small">
-                                <ChevronLeft size={16} />
+                    <div className="flex items-center gap-1">
+                        <Tooltip title={isMaximized ? "Restore View" : "Maximize View"}>
+                            <IconButton 
+                                onClick={onMaximize} 
+                                size="small"
+                                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } }}
+                            >
+                                {isMaximized ? <WindowRestoreIcon size={18} /> : <WindowMaximizeIcon size={18} />}
                             </IconButton>
                         </Tooltip>
-                    )}
+                        
+                        {!isMaximized && (
+                            <Tooltip title="Collapse Panel">
+                                <IconButton 
+                                    onClick={onCollapse} 
+                                    size="small"
+                                    sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } }}
+                                >
+                                    {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            <div className="">
-                <div className="flex items-center gap-3 mb-2">
-                    <Typography variant="h5" fontWeight={800} color="text.primary" sx={{ lineHeight: 1.2 }}>
-                        {question.title}
-                    </Typography>
-                    <Chip
-                        label={question.difficulty}
-                        size="small"
-                        sx={{
-                            fontWeight: 700,
-                            textTransform: 'capitalize',
-                            height: 24,
-                            bgcolor: question.difficulty === "easy" ? '#ecfdf5' : question.difficulty === "medium" ? '#fffbeb' : '#fef2f2',
-                            color: question.difficulty === "easy" ? '#059669' : question.difficulty === "medium" ? '#d97706' : '#dc2626',
-                            border: '1px solid',
-                            borderColor: question.difficulty === "easy" ? '#a7f3d0' : question.difficulty === "medium" ? '#fde68a' : '#fecaca',
-                        }}
-                    />
+            {/* Content Spacing Wrapper */}
+            <div className="px-6 pt-3">
+
+            {/* Question Details Header - stacked layout */}
+            <div className="mb-6">
+                {/* Top Row: Meta & Actions */}
+                <div className="flex items-center gap-3 mb-3">
+                    {/* Number */}
+                    <div className="flex items-center justify-center h-6 px-2.5 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-600 font-mono text-xs font-bold shadow-sm">
+                        #{(topicQuestions?.findIndex(q => q.id.toString() === currentQuestionId.toString()) + 1 || 0).toString().padStart(2, '0')}
+                    </div>
+
+                    {/* Difficulty */}
+                    <div className={`h-6 flex items-center px-2.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                        question.difficulty === 'easy' 
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                            : question.difficulty === 'medium' 
+                                ? 'bg-amber-50 text-amber-600 border-amber-100' 
+                                : 'bg-rose-50 text-rose-600 border-rose-100'
+                    }`}>
+                        {question.difficulty}
+                    </div>
                 </div>
 
+                {/* Second Row: Title */}
+                <Typography component="h1" variant="h4" fontWeight={800} sx={{ color: '#1e293b', lineHeight: 1.25, fontSize: { xs: '1.25rem', md: '1.5rem' }, mb: 1 }}>
+                    {question.title}
+                </Typography>
+
+                {/* Third Row: Complexity (if available) */}
                 {(result?.time_complexity || result?.space_complexity) && (
-                    <div className="flex gap-3 text-xs font-medium text-zinc-500">
-                        {result.time_complexity && (
+                    <div className="flex flex-wrap gap-2 text-xs font-medium text-zinc-500 mt-2">
+                         {result.time_complexity && (
                             <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-50 text-zinc-600 border border-zinc-100">
                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                                 {result.time_complexity}
+                            </span>
+                        )}
+                        {result.space_complexity && (
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-50 text-zinc-600 border border-zinc-100">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                {result.space_complexity}
                             </span>
                         )}
                     </div>
@@ -762,7 +823,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
             </div>
 
             {/* Modern Tabs (Segmented Control - Squared) */}
-            <div className="bg-zinc-200/80 p-1 rounded-lg flex gap-1 mb-2 self-start">
+            <div className="bg-zinc-100/80 p-1 rounded-lg flex gap-1 mb-2 self-start">
                 <button
                     onClick={() => setLeftTab(0)}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${leftTab === 0 ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/5' : 'text-zinc-500 hover:text-zinc-700'}`}
@@ -778,6 +839,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     </button>
                 )}
             </div>
+            </div> {/* Closing Content Spacing Wrapper */}
         </div>
     );
 
@@ -915,92 +977,98 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     );
 
     const renderRightTopHeader = ({ isMaximized, onMaximize }: any) => (
-        <div className="h-12 bg-white flex items-center justify-between px-4 shrink-0 z-20">
-            <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+        <div className="h-14 md:h-12 bg-white flex items-center justify-between px-2 md:px-4 shrink-0 z-20 border-b border-zinc-100/50">
+            <div className="flex items-center gap-2 md:gap-3">
+                <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 hidden sm:flex">
                     <Code2 size={16} strokeWidth={2.5} />
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-sm font-bold text-zinc-800 leading-none tracking-tight">{question.programming_language || "Code"}</span>
+                    <span className="text-xs md:text-sm font-bold text-zinc-800 leading-none tracking-tight">{question.programming_language || "Code"}</span>
                     {/* <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mt-0.5">Editor</span> */}
                 </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
 
                 <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
-                    <IconButton onClick={onMaximize} size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } }}>
+                    <IconButton onClick={onMaximize} size="small" sx={{ color: 'text.secondary', display: { xs: 'none', md: 'inline-flex' }, '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } }}>
                         {isMaximized ? <WindowRestoreIcon size={16} /> : <WindowMaximizeIcon size={16} />}
                     </IconButton>
                 </Tooltip>
 
-                <div className="w-px h-5 bg-zinc-200 mx-1" />
+                <div className="w-px h-5 bg-zinc-200 mx-1 hidden md:block" />
 
                 {/* Action Group */}
-                <div className="flex items-center rounded-[6px]  border border-zinc-200">
-                    <Button
-                        variant="text"
-                        size="small"
-                        onClick={() => setResetDialogOpen(true)}
-                        startIcon={isResetting ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                        disabled={isResetting || submitting}
-                        sx={{
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            borderRadius: '8px',
-                            color: 'text.secondary',
-                            minWidth: 'auto',
-                            px: 2,
-                            fontSize: '0.8rem',
-                            '&:hover': { bgcolor: 'white', color: 'error.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
-                        }}
-                    >
-                        Reset
-                    </Button>
-                    <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 1 }} />
-                    <Button
-                        variant="text"
-                        size="small"
-                        disabled={submitting}
-                        onClick={handleCodeRun}
-                        startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Play size={15} className="fill-current" />}
-                        sx={{
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            borderRadius: '6px',
-                            color: 'text.secondary',
-                            minWidth: 'auto',
-                            px: 3,
-                            fontSize: '0.8rem',
-                            '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
-                        }}
-                    >
-                        Run
-                    </Button>
+                <div className="flex items-center rounded-[8px] bg-zinc-50/50 border border-zinc-200/60 p-0.5">
+                    <Tooltip title="Reset Code">
+                        <Button
+                            variant="text"
+                            size="small"
+                            onClick={() => setResetDialogOpen(true)}
+                            disabled={isResetting || submitting}
+                            sx={{
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                borderRadius: '6px',
+                                color: 'text.secondary',
+                                minWidth: '32px',
+                                px: { xs: 1, sm: 2 },
+                                height: 32,
+                                '&:hover': { bgcolor: 'white', color: 'error.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
+                            }}
+                        >
+                            {isResetting ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                            <span className="hidden sm:inline ml-2 text-xs">Reset</span>
+                        </Button>
+                    </Tooltip>
+                    
+                    <div className="w-px h-4 bg-zinc-200 mx-0.5" />
+                    
+                    <Tooltip title="Run Code">
+                        <Button
+                            variant="text"
+                            size="small"
+                            disabled={submitting}
+                            onClick={handleCodeRun}
+                            sx={{
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                borderRadius: '6px',
+                                color: 'text.secondary',
+                                minWidth: '32px',
+                                px: { xs: 1, sm: 2 },
+                                height: 32, 
+                                '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
+                            }}
+                        >
+                             {submitting ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} className="fill-current" />}
+                             <span className="hidden sm:inline ml-2 text-xs">Run</span>
+                        </Button>
+                    </Tooltip>
+
                     {editorLanguage === 'python' && (
                         <>
-                            <div className="w-px h-4 bg-zinc-300" />
-                            <Button
-                                variant="text"
-                                size="small"
-                                onClick={() => setShowVisualizer(true)}
-                                startIcon={<Eye size={15} />}
-                                sx={{
-                                    textTransform: 'none',
-                                    fontWeight: 600,
-                                    borderRadius: '6px',
-                                    color: 'text.secondary',
-                                    minWidth: 'auto',
-                                    px: 3,
-                                    fontSize: '0.8rem',
-                                    '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
-                                }}
-                            >
-                                Visualizer
-                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-600 border border-purple-200 uppercase tracking-wide">
-                                    Beta
-                                </span>
-                            </Button>
+                            <div className="w-px h-4 bg-zinc-200 mx-0.5" />
+                            <Tooltip title="Visualizer (Beta)">
+                                <Button
+                                    variant="text"
+                                    size="small"
+                                    onClick={() => setShowVisualizer(true)}
+                                    sx={{
+                                        textTransform: 'none',
+                                        fontWeight: 600,
+                                        borderRadius: '6px',
+                                        color: 'text.secondary',
+                                        minWidth: '32px',
+                                        px: { xs: 1, sm: 2 },
+                                        height: 32,
+                                        '&:hover': { bgcolor: 'white', color: 'primary.main', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
+                                    }}
+                                >
+                                    <Eye size={14} />
+                                    <span className="hidden sm:inline ml-2 text-xs">Visualize</span>
+                                </Button>
+                            </Tooltip>
                         </>
                     )}
                 </div>
@@ -1011,21 +1079,21 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     size="small"
                     disabled={submitting}
                     onClick={() => setSaveDialogOpen(true)}
-                    startIcon={isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={16} />}
                     sx={{
                         textTransform: 'none',
                         fontWeight: 600,
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        px: 3,
-                        py: 1.5,
-                        mr: 1,
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        px: { xs: 0, sm: 3 },
+                        minWidth: { xs: 36, sm: 'auto' }, // Icon only on mobile
+                        height: 36,
                         borderColor: '#e0e7ff',
                         color: '#4f46e5',
                         '&:hover': { bgcolor: '#eef2ff', borderColor: '#c7d2fe' }
                     }}
                 >
-                    Save
+                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                     <span className="hidden sm:inline ml-2">Save</span>
                 </Button>
 
                 <Button
@@ -1034,22 +1102,21 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     size="small"
                     disabled={submitting}
                     onClick={() => setSubmitDialogOpen(true)}
-                    startIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <CloudUploadIcon sx={{ fontSize: 18 }} />}
                     sx={{
                         textTransform: 'none',
                         fontWeight: 700,
-                        borderRadius: '6px',
-                        boxShadow: '0 2px 5px rgba(79, 70, 229, 0.2)',
-                        fontSize: '0.85rem',
-                        px: 3,
-                        py: 1.5,
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        px: { xs: 2, sm: 3 },
+                        height: 36,
                         background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
+                        boxShadow: '0 2px 5px rgba(79, 70, 229, 0.2)',
                         '&:hover': { boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)', background: 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)' }
                     }}
                 >
-                    Submit
+                    {submitting ? <Loader2 size={16} className="animate-spin" /> : <CloudUploadIcon sx={{ fontSize: 18 }} />}
+                    <span className="hidden sm:inline ml-2">Submit</span>
                 </Button>
-
 
             </div>
         </div>
@@ -1359,65 +1426,144 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 open={drawerOpen}
                 onClose={() => setDrawerOpen(false)}
                 PaperProps={{
-                    sx: { width: 450, borderRadius: '0 16px 16px 0', border: 'none' }
+                    sx: { 
+                        width: { xs: '100%', sm: 420 }, 
+                        borderRadius: { xs: 0, sm: '0 24px 24px 0' }, 
+                        border: 'none',
+                        boxShadow: '8px 0 32px rgba(0,0,0,0.08)'
+                    }
                 }}
             >
-                <Box p={3} display="flex" justifyContent="space-between" alignItems="center" borderBottom="1px solid #f3f4f6">
-                    <Typography variant="h6" fontWeight={700} color="text.primary">Questions</Typography>
-                    <IconButton onClick={() => setDrawerOpen(false)} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
+                {/* Header */}
+                <Box p={3} borderBottom="1px solid" borderColor="divider" display="flex" alignItems="center" justifyContent="space-between" bgcolor="#ffffff">
+                    <div>
+                        <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: '-0.5px', color: '#0f172a' }}>
+                            Topic Questions
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" fontWeight={500} sx={{ mt: 0.5, display: 'block' }}>
+                            {topicQuestions.length} challenges available
+                        </Typography>
+                    </div>
+                    <IconButton 
+                        onClick={() => setDrawerOpen(false)} 
+                        size="small" 
+                        sx={{ 
+                            color: 'text.secondary',
+                            bgcolor: 'action.hover', 
+                            '&:hover': { bgcolor: 'error.50', color: 'error.main' }
+                        }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
                 </Box>
-                <List sx={{ pt: 1 }}>
-                    {loadingTopicQuestions && <Box p={4} textAlign="center"><CircularProgress size={24} /></Box>}
-                    {!loadingTopicQuestions && topicQuestions.map(q => {
-                        const isCurrent = q.id.toString() === currentQuestionId;
 
-                        let StatusIcon = <div className="w-2.5 h-2.5 rounded-full bg-zinc-300" />;
-                        if (q.status === 'solved') {
-                            StatusIcon = <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm" />;
-                        } else if (q.status === 'attempted') {
-                            StatusIcon = <div className="w-2.5 h-2.5 rounded-full bg-orange-400 shadow-sm" />;
-                        }
+                {/* List Container */}
+                <Box sx={{ overflowY: 'auto', flex: 1, p: 2, bgcolor: '#f8fafc' }} className="custom-scrollbar">
+                    {loadingTopicQuestions ? (
+                        <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height={200} gap={2}>
+                            <CircularProgress size={24} thickness={5} sx={{ color: 'primary.main' }} />
+                            <Typography variant="caption" color="text.secondary">Loading list...</Typography>
+                        </Box>
+                    ) : (
+                        <List disablePadding sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            {topicQuestions.map((q, index) => {
+                                const isCurrent = q.id.toString() === currentQuestionId;
+                                const isSolved = q.status === 'solved';
+                                const isAttempted = q.status === 'attempted';
 
-                        return (
-                            <ListItem key={q.id} disablePadding sx={{ px: 2, py: 0.5 }}>
-                                <ListItemButton
-                                    selected={isCurrent}
-                                    onClick={() => handleSwitchQuestion(q.id)}
-                                    sx={{
-                                        borderRadius: 2,
-                                        '&.Mui-selected': { bgcolor: 'primary.lighter', '&:hover': { bgcolor: 'primary.lighter' } }
-                                    }}
-                                >
-                                    <ListItemIcon sx={{ minWidth: 24, pr: 1 }}>
-                                        {StatusIcon}
-                                    </ListItemIcon>
-                                    <ListItemText
-                                        primary={q.title}
-                                        secondary={q.difficulty.toUpperCase()}
-                                        primaryTypographyProps={{ variant: 'body2', fontWeight: isCurrent ? 600 : 400, color: isCurrent ? 'text.primary' : 'text.secondary' }}
-                                        secondaryTypographyProps={{
-                                            variant: 'caption',
-                                            fontWeight: 600,
-                                            sx: {
-                                                fontSize: '0.65rem',
-                                                mt: 0.5,
-                                                display: 'inline-block',
-                                                px: 1,
-                                                py: 0.2,
-                                                borderRadius: 1,
-                                                bgcolor: q.difficulty === 'easy' ? 'success.lighter' : q.difficulty === 'medium' ? 'warning.lighter' : 'error.lighter',
-                                                color: q.difficulty === 'easy' ? 'success.dark' : q.difficulty === 'medium' ? 'warning.dark' : 'error.dark'
-                                            }
-                                        }}
-                                    />
-                                </ListItemButton>
-                            </ListItem>
-                        );
-                    })}
-                    {!loadingTopicQuestions && topicQuestions.length === 0 && (
-                        <Box p={3} textAlign="center" color="text.disabled" fontSize="0.875rem">No other questions found.</Box>
+                                return (
+                                    <ListItem key={q.id} disablePadding>
+                                        <ListItemButton
+                                            selected={isCurrent}
+                                            onClick={() => handleSwitchQuestion(q.id)}
+                                            sx={{
+                                                borderRadius: '8px', 
+                                                py: 1.5,
+                                                px: 2,
+                                                bgcolor: isCurrent ? '#ffffff' : 'transparent',
+                                                border: '1px solid',
+                                                // Active border 50% transparent (using mapped color or rgba equivalent of indigo-600)
+                                                borderColor: isCurrent ? 'rgba(79, 70, 229, 0.5)' : 'transparent', 
+                                                boxShadow: isCurrent ? '0 4px 20px rgba(79, 70, 229, 0.12)' : 'none',
+                                                position: 'relative',
+                                                overflow: 'hidden',
+                                                '&:hover': {
+                                                    bgcolor: isCurrent ? '#ffffff' : 'zinc.50',
+                                                    borderColor: isCurrent ? 'rgba(79, 70, 229, 0.5)' : 'zinc.200',
+                                                    transform: 'translateY(-1px)',
+                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                                                },
+                                                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                                '&.Mui-selected': { bgcolor: '#ffffff', '&:hover': { bgcolor: '#ffffff' } }
+                                            }}
+                                        >
+                                            {/* Active Indicator Bar */}
+                                            {isCurrent && (
+                                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-600 rounded-r-full" />
+                                            )}
+
+                                            {/* Status Dot */}
+                                            <div className="flex items-center justify-center mr-3 shrink-0">
+                                                {isSolved ? (
+                                                    // Improved Solved: Filled green circle, clean and neat
+                                                    <div className="flex items-center justify-center w-7 h-7 rounded-md bg-emerald-500 text-white shadow-sm shadow-emerald-200">
+                                                        <CheckCircle2 size={16} className="stroke-[3]" />
+                                                    </div>
+                                                ) : isAttempted ? (
+                                                    <div className="flex items-center justify-center w-7 h-7 rounded-md bg-amber-50 text-amber-600 ring-1 ring-amber-200">
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
+                                                    </div>
+                                                ) : (
+                                                    // Improved Inactive Number: clearly visible, neat, high contrast
+                                                    <div className="w-7 h-7 flex items-center justify-center rounded-md bg-white border border-zinc-300 text-zinc-600 shadow-sm">
+                                                        <span className="text-[11px] font-bold">{(index + 1).toString()}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Question Info */}
+                                            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                                <div className="flex items-center gap-2">
+                                                    <Typography 
+                                                        variant="body2" 
+                                                        fontWeight={isCurrent ? 700 : 600} 
+                                                        color={isCurrent ? 'text.primary' : 'text.zinc.700'}
+                                                        noWrap
+                                                        sx={{ fontSize: '0.95rem' }}
+                                                    >
+                                                        {q.title}
+                                                    </Typography>
+                                                </div>
+                                            </div>
+
+                                            {/* Difficulty Badge */}
+                                            <div className="ml-3 shrink-0">
+                                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border shadow-sm ${
+                                                    q.difficulty === 'easy' 
+                                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                                                        : q.difficulty === 'medium' 
+                                                            ? 'bg-amber-50 text-amber-600 border-amber-100' 
+                                                            : 'bg-rose-50 text-rose-600 border-rose-100'
+                                                }`}>
+                                                    {q.difficulty}
+                                                </span>
+                                            </div>
+                                        </ListItemButton>
+                                    </ListItem>
+                                );
+                            })}
+                        </List>
                     )}
-                </List>
+                    
+                    {!loadingTopicQuestions && topicQuestions.length === 0 && (
+                        <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height={200} color="text.disabled">
+                             <div className="w-12 h-12 bg-zinc-100 rounded-full flex items-center justify-center mb-3">
+                                <ListIcon sx={{ fontSize: 24, opacity: 0.3 }} />
+                            </div>
+                            <Typography variant="body2">No questions found.</Typography>
+                        </Box>
+                    )}
+                </Box>
             </Drawer>
 
       <ThreePaneLayout
