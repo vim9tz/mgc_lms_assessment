@@ -206,6 +206,13 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     const themes = [
         { id: 'vs-dark', name: 'Dark Default', type: 'dark', color: '#1e1e1e' },
         { id: 'vs', name: 'Light Default', type: 'light', color: '#ffffff' },
+        { id: 'github-light', name: 'GitHub Light', type: 'light', color: '#ffffff' },
+        { id: 'quiet-light', name: 'Quiet Light', type: 'light', color: '#f5f5f5' },
+        { id: 'atom-one-light', name: 'Atom One Light', type: 'light', color: '#fafafa' },
+        { id: 'solarized-light', name: 'Solarized Light', type: 'light', color: '#fdf6e3' },
+        { id: 'horizon-light', name: 'Horizon Light', type: 'light', color: '#fdf0ed' },
+        { id: 'minimal-light', name: 'Minimal Light', type: 'light', color: '#f8f9fa' },
+        { id: 'soft-light', name: 'Soft Light', type: 'light', color: '#fcfcfc' },
         { id: 'hc-black', name: 'High Contrast', type: 'dark', color: '#000000' },
         { id: 'monokai', name: 'Monokai', type: 'dark', color: '#272822' },
         { id: 'cobalt', name: 'Cobalt', type: 'dark', color: '#002240' },
@@ -219,7 +226,6 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         { id: 'rose-pine', name: 'Rose Pine', type: 'dark', color: '#191724' },
         { id: 'oceanic-next', name: 'Oceanic Next', type: 'dark', color: '#1b2b34' },
         { id: 'solarized-dark', name: 'Solarized Dark', type: 'dark', color: '#002b36' },
-        { id: 'solarized-light', name: 'Solarized Light', type: 'light', color: '#fdf6e3' },
         { id: 'github-dark', name: 'Github Dark', type: 'dark', color: '#24292e' },
         { id: 'nord', name: 'Nord', type: 'dark', color: '#2e3440' }
     ];
@@ -255,6 +261,12 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
             { id: 'oceanic-next', bg: '#1b2b34' },
             { id: 'solarized-dark', bg: '#002b36' },
             { id: 'solarized-light', bg: '#fdf6e3', base: 'vs' },
+            { id: 'github-light', bg: '#ffffff', base: 'vs' },
+            { id: 'quiet-light', bg: '#f5f5f5', base: 'vs' },
+            { id: 'atom-one-light', bg: '#fafafa', base: 'vs' },
+            { id: 'horizon-light', bg: '#fdf0ed', base: 'vs' },
+            { id: 'minimal-light', bg: '#f8f9fa', base: 'vs' },
+            { id: 'soft-light', bg: '#fcfcfc', base: 'vs' },
             { id: 'github-dark', bg: '#24292e' },
             { id: 'nord', bg: '#2e3440' }
         ];
