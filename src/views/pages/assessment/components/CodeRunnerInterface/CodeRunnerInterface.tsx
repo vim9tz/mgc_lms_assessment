@@ -28,8 +28,13 @@ import {
     Dialog,
     DialogTitle,
     DialogContent,
-    DialogActions
+    DialogActions,
+    Popover,
+    Switch,
+    FormControlLabel,
+    Portal
 } from "@mui/material";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     PlayArrow,
     CheckCircle,
@@ -59,7 +64,14 @@ import {
     LogOut, Play, Code2, Terminal, List as LucideList, X, Loader2, CheckCircle2, XCircle, Eye,
     Save, FileX, RefreshCw,
     CheckCircleIcon,
-    CheckCircle2Icon
+    CheckCircle2Icon,
+    Settings,
+    Palette,
+    Moon,
+    Sun,
+    Monitor,
+    Type,
+    GripVertical
 } from 'lucide-react';
 
 // Monaco editor (client-only)
@@ -179,6 +191,84 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
+    // Editor Settings & Themes
+    const [editorTheme, setEditorTheme] = useState("vs");
+    const [settingsAnchor, setSettingsAnchor] = useState<null | HTMLElement>(null);
+    const [editorFontSize, setEditorFontSize] = useState(14);
+    const [editorSettingsTab, setEditorSettingsTab] = useState(0); // 0: Appearance, 1: Editor
+    
+    // Advanced Editor Options
+    const [showMinimap, setShowMinimap] = useState(true);
+    const [showLineNumbers, setShowLineNumbers] = useState(true);
+    const [wordWrap, setWordWrap] = useState(true);
+    const [autoClosingBrackets, setAutoClosingBrackets] = useState(true);
+
+    const themes = [
+        { id: 'vs-dark', name: 'Dark Default', type: 'dark', color: '#1e1e1e' },
+        { id: 'vs', name: 'Light Default', type: 'light', color: '#ffffff' },
+        { id: 'hc-black', name: 'High Contrast', type: 'dark', color: '#000000' },
+        { id: 'monokai', name: 'Monokai', type: 'dark', color: '#272822' },
+        { id: 'cobalt', name: 'Cobalt', type: 'dark', color: '#002240' },
+        { id: 'dracula', name: 'Dracula', type: 'dark', color: '#282a36' },
+        { id: 'night-owl', name: 'Night Owl', type: 'dark', color: '#011627' },
+        { id: 'tokyo-night', name: 'Tokyo Night', type: 'dark', color: '#1a1b26' },
+        { id: 'one-dark-pro', name: 'One Dark Pro', type: 'dark', color: '#282c34' },
+        { id: 'material-ocean', name: 'Material Ocean', type: 'dark', color: '#0f111a' },
+        { id: 'synthwave-84', name: 'SynthWave 84', type: 'dark', color: '#2b213a' },
+        { id: 'shades-of-purple', name: 'Shades of Purple', type: 'dark', color: '#2d2b55' },
+        { id: 'rose-pine', name: 'Rose Pine', type: 'dark', color: '#191724' },
+        { id: 'oceanic-next', name: 'Oceanic Next', type: 'dark', color: '#1b2b34' },
+        { id: 'solarized-dark', name: 'Solarized Dark', type: 'dark', color: '#002b36' },
+        { id: 'solarized-light', name: 'Solarized Light', type: 'light', color: '#fdf6e3' },
+        { id: 'github-dark', name: 'Github Dark', type: 'dark', color: '#24292e' },
+        { id: 'nord', name: 'Nord', type: 'dark', color: '#2e3440' }
+    ];
+
+
+
+    const handleSettingsClick = (event: React.MouseEvent<HTMLElement>) => {
+        setSettingsAnchor(event.currentTarget);
+    };
+
+    const handleSettingsClose = () => {
+        setSettingsAnchor(null);
+    };
+
+    const handleThemeChange = (themeId: string) => {
+        setEditorTheme(themeId);
+        // localStorage.setItem('editor-theme', themeId);
+    };
+
+    const handleEditorWillMount = (monaco: any) => {
+        // Define additional themes
+        const customThemes = [
+            { id: 'monokai', bg: '#272822' },
+            { id: 'cobalt', bg: '#002240' },
+            { id: 'dracula', bg: '#282a36' },
+            { id: 'night-owl', bg: '#011627' },
+            { id: 'tokyo-night', bg: '#1a1b26' },
+            { id: 'one-dark-pro', bg: '#282c3c' },
+            { id: 'material-ocean', bg: '#0f111a' },
+            { id: 'synthwave-84', bg: '#2b213a' },
+            { id: 'shades-of-purple', bg: '#2d2b55' },
+            { id: 'rose-pine', bg: '#191724' },
+            { id: 'oceanic-next', bg: '#1b2b34' },
+            { id: 'solarized-dark', bg: '#002b36' },
+            { id: 'solarized-light', bg: '#fdf6e3', base: 'vs' },
+            { id: 'github-dark', bg: '#24292e' },
+            { id: 'nord', bg: '#2e3440' }
+        ];
+
+        customThemes.forEach(t => {
+            monaco.editor.defineTheme(t.id, {
+                base: (t as any).base || 'vs-dark',
+                inherit: true,
+                rules: [],
+                colors: { 'editor.background': (t as any).bg }
+            });
+        });
+    };
+
 
     const [expanded, setExpanded] = useState<number | false>(false)
 
@@ -186,6 +276,37 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         (panel: number) => (_: any, isExpanded: boolean) => {
             setExpanded(isExpanded ? panel : false)
         }
+
+    // Load Settings from LocalStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('mgc-editor-preferences');
+        if (saved) {
+            try {
+                const prefs = JSON.parse(saved);
+                if (prefs.theme) setEditorTheme(prefs.theme);
+                if (prefs.fontSize) setEditorFontSize(prefs.fontSize);
+                if (prefs.minimap !== undefined) setShowMinimap(prefs.minimap);
+                if (prefs.lineNumbers !== undefined) setShowLineNumbers(prefs.lineNumbers);
+                if (prefs.wordWrap !== undefined) setWordWrap(prefs.wordWrap);
+                if (prefs.autoBrackets !== undefined) setAutoClosingBrackets(prefs.autoBrackets);
+            } catch (e) {
+                console.error("Failed to load editor preferences", e);
+            }
+        }
+    }, []);
+
+    // Save Settings to LocalStorage
+    useEffect(() => {
+        const prefs = {
+            theme: editorTheme,
+            fontSize: editorFontSize,
+            minimap: showMinimap,
+            lineNumbers: showLineNumbers,
+            wordWrap: wordWrap,
+            autoBrackets: autoClosingBrackets
+        };
+        localStorage.setItem('mgc-editor-preferences', JSON.stringify(prefs));
+    }, [editorTheme, editorFontSize, showMinimap, showLineNumbers, wordWrap, autoClosingBrackets]);
 
     const handleExit = () => {
         setExitDialogOpen(true);
@@ -1118,26 +1239,54 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                     <span className="hidden sm:inline ml-2">Submit</span>
                 </Button>
 
+                <div className="w-px h-5 bg-zinc-200 mx-1 hidden md:block" />
+
+                <Tooltip title="Editor Settings">
+                    <IconButton 
+                        onClick={handleSettingsClick} 
+                        size="small" 
+                        sx={{ 
+                            bgcolor: settingsAnchor ? 'primary.50' : 'transparent',
+                            color: settingsAnchor ? 'primary.main' : 'text.secondary',
+                            border: '1px solid',
+                            borderColor: settingsAnchor ? 'primary.100' : 'transparent',
+                            '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } 
+                        }}
+                    >
+                        <Settings size={18} />
+                    </IconButton>
+                </Tooltip>
+
             </div>
         </div>
     );
 
+    const currentThemeData = themes.find(t => t.id === editorTheme) || themes[0];
+
     const RightTopContent = (
-        <div className="h-full relative bg-[#1e1e1e]">
+        <div className="h-full relative" style={{ backgroundColor: currentThemeData.color }}>
             <Editor
                 height="100%"
                 language={editorLanguage}
                 value={code}
                 onChange={(v) => setCode(v || "")}
-                theme="vs-dark"
+                theme={editorTheme}
+                beforeMount={handleEditorWillMount}
                 options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                    minimap: { enabled: showMinimap },
+                    fontSize: editorFontSize,
+                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace",
+                    lineNumbers: showLineNumbers ? 'on' : 'off',
+                    wordWrap: wordWrap ? 'on' : 'off',
+                    autoClosingBrackets: autoClosingBrackets ? 'always' : 'never',
                     lineHeight: 24,
                     padding: { top: 16 },
                     scrollBeyondLastLine: false,
-                    automaticLayout: true
+                    automaticLayout: true,
+                    guides: {
+                        indentation: true,
+                        bracketPairs: true
+                    }
                 }}
             />
         </div>
@@ -1648,6 +1797,220 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
               <PythonVisualizer code={code} onChangeCode={setCode} />
           </DialogContent>
       </Dialog>
+
+            {/* DRAGGABLE EDITOR SETTINGS PANEL */}
+            <AnimatePresence>
+                {settingsAnchor && (
+                    <Portal>
+                        {/* Overlay to handle close on click outside (optional, but requested behavior usually implies this or a dedicated close) */}
+                        <div 
+                            style={{ position: 'fixed', inset: 0, zIndex: 1290 }} 
+                            onClick={handleSettingsClose} 
+                        />
+                        
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 10, x: -20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                            drag
+                            dragMomentum={false}
+                            dragElastic={0.1}
+                            style={{
+                                position: 'fixed',
+                                top: 80,
+                                right: 40,
+                                zIndex: 1300,
+                                width: 320,
+                                cursor: 'default'
+                            }}
+                        >
+                            <Box 
+                                sx={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'column', 
+                                    maxHeight: '80vh',
+                                    borderRadius: '24px',
+                                    boxShadow: '0 30px 60px -12px rgba(0,0,0,0.3)',
+                                    border: '1px solid rgba(255, 255, 255, 0.4)',
+                                    overflow: 'hidden',
+                                    backdropFilter: 'blur(30px) saturate(150%)',
+                                    bgcolor: 'rgba(255, 255, 255, 0.85)',
+                                    '@supports not (backdrop-filter: blur(30px))': {
+                                        bgcolor: 'rgba(255, 255, 255, 0.98)'
+                                    }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Header with Drag Handle */}
+                                <Box 
+                                    p={3} 
+                                    pb={2} 
+                                    display="flex" 
+                                    alignItems="center" 
+                                    justifyContent="space-between" 
+                                    borderBottom="1px solid" 
+                                    borderColor="rgba(0,0,0,0.04)"
+                                    sx={{ cursor: 'grab', '&:active': { cursor: 'grabbing' } }}
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900 text-white shadow-lg shadow-zinc-900/20">
+                                            <Settings size={14} strokeWidth={3} />
+                                        </div>
+                                        <div>
+                                            <Typography variant="subtitle2" fontWeight={800} sx={{ color: '#0f172a', letterSpacing: '-0.01em', fontSize: '13px' }}>
+                                                Workspace Settings
+                                            </Typography>
+                                            <div className="flex items-center gap-1 opacity-50">
+                                                 <GripVertical size={10} />
+                                                 <Typography variant="caption" sx={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Draggable</Typography>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <IconButton 
+                                        onClick={handleSettingsClose} 
+                                        size="small" 
+                                        sx={{ 
+                                            color: 'text.secondary',
+                                            bgcolor: 'rgba(0,0,0,0.03)',
+                                            '&:hover': { bgcolor: 'error.50', color: 'error.main' }
+                                        }}
+                                    >
+                                        <X size={14} />
+                                    </IconButton>
+                                </Box>
+
+                                {/* Sophisticated Tabs */}
+                                <Box px={3} mb={1} mt={1}>
+                                    <div className="flex p-1 bg-black/[0.03] rounded-2xl gap-1">
+                                        <button
+                                            onClick={() => setEditorSettingsTab(0)}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${
+                                                editorSettingsTab === 0 
+                                                ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/[0.03]' 
+                                                : 'text-zinc-400 hover:text-zinc-600'
+                                            }`}
+                                        >
+                                            <Palette size={12} strokeWidth={2.5} />
+                                            UI
+                                        </button>
+                                        <button
+                                            onClick={() => setEditorSettingsTab(1)}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${
+                                                editorSettingsTab === 1 
+                                                ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/[0.03]' 
+                                                : 'text-zinc-400 hover:text-zinc-600'
+                                            }`}
+                                        >
+                                            <Code2 size={12} strokeWidth={2.5} />
+                                            Editor
+                                        </button>
+                                    </div>
+                                </Box>
+
+                                <Box p={2.5} pt={1.5} sx={{ overflowY: 'auto' }} className="custom-scrollbar">
+                                    {editorSettingsTab === 0 ? (
+                                        <div className="space-y-5">
+                                            {/* Themes section */}
+                                            <div>
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <Typography variant="caption" fontWeight={800} sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>
+                                                        Themes
+                                                    </Typography>
+                                                    <Chip label={`${themes.length}`} size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 800, bgcolor: 'zinc.100', color: 'zinc.900' }} />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                                                    {themes.map((t) => (
+                                                        <button
+                                                            key={t.id}
+                                                            onClick={() => handleThemeChange(t.id)}
+                                                            className={`group flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border ${
+                                                                editorTheme === t.id 
+                                                                ? 'bg-zinc-900 border-zinc-900 text-white shadow-md shadow-zinc-900/20' 
+                                                                : 'bg-white border-zinc-100 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+                                                            }`}
+                                                        >
+                                                            <div 
+                                                                className="w-3.5 h-3.5 rounded-full shadow-inner transition-transform"
+                                                                style={{ backgroundColor: t.color, border: t.type === 'light' ? '1px solid #e2e8f0' : 'none' }}
+                                                            />
+                                                            <span className="truncate">{t.name}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-5">
+                                            {/* Font Size */}
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-3 text-zinc-800">
+                                                    <Type size={12} className="text-zinc-400" strokeWidth={2.5} />
+                                                    <Typography variant="caption" fontWeight={800} sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Font Size</Typography>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 bg-black/[0.03] p-1 rounded-xl">
+                                                    {[12, 14, 16, 18, 20].map((size) => (
+                                                        <button
+                                                            key={size}
+                                                            onClick={() => setEditorFontSize(size)}
+                                                            className={`flex-1 py-1.5 text-[10px] font-black rounded-lg transition-all ${
+                                                                editorFontSize === size 
+                                                                ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/[0.03]' 
+                                                                : 'text-zinc-500 hover:text-zinc-700'
+                                                            }`}
+                                                        >
+                                                            {size}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-1.5">
+                                                <div className="flex items-center gap-2 mb-2 text-zinc-800">
+                                                    <Monitor size={12} className="text-zinc-400" strokeWidth={2.5} />
+                                                    <Typography variant="caption" fontWeight={800} sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Behavior</Typography>
+                                                </div>
+                                                
+                                                {[
+                                                    { icon: <Monitor size={14} />, label: 'Minimap', state: showMinimap, setter: setShowMinimap },
+                                                    { icon: <ChevronRight size={14} />, label: 'Lines', state: showLineNumbers, setter: setShowLineNumbers },
+                                                    { icon: <RefreshCw size={14} />, label: 'Wrap', state: wordWrap, setter: setWordWrap },
+                                                    { icon: <Code2 size={14} />, label: 'Brackets', state: autoClosingBrackets, setter: setAutoClosingBrackets },
+                                                ].map((option, i) => (
+                                                    <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-zinc-100/80 hover:border-zinc-200 transition-colors">
+                                                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: '11px', color: 'text.primary' }}>{option.label}</Typography>
+                                                        <Switch 
+                                                            checked={option.state} 
+                                                            onChange={(e) => option.setter(e.target.checked)} 
+                                                            size="small"
+                                                            sx={{ 
+                                                                '& .MuiSwitch-switchBase.Mui-checked': { color: '#18181b' },
+                                                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#edf1ffff' }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </Box>
+
+                                {/* Sophisticated Minimal Footer */}
+                                <Box px={3} py={2.5} bgcolor="rgba(0,0,0,0.02)" borderTop="1px solid rgba(0,0,0,0.04)" display="flex" justifyContent="space-between" alignItems="center">
+                                    <Typography variant="caption" color="text.primary" sx={{ fontWeight: 800, fontSize: '8px', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.3 }}>
+                                        Engine v2.1
+                                    </Typography>
+                                    <button 
+                                        onClick={handleSettingsClose} 
+                                        className="px-5 py-2 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-black transition-all shadow-[0_10px_20px_-5px_rgba(0,0,0,0.3)] active:scale-95"
+                                    >
+                                        Save
+                                    </button>
+                                </Box>
+                            </Box>
+                        </motion.div>
+                    </Portal>
+                )}
+            </AnimatePresence>
 
 
             {/* SUBMIT CONFIRMATION DIALOG */}
