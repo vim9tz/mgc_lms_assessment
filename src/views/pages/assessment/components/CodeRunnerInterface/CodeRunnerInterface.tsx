@@ -875,190 +875,69 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     /* ================= RENDER ================= */
 
     const renderLeftHeader = ({ isMaximized, isCollapsed, onMaximize, onCollapse }: any) => (
-        <div className="bg-white z-10 border-b border-zinc-200 flex flex-col">
-            {/* Top Navigation Bar */}
-            <div className="h-12 flex items-center justify-between px-4 border-b border-zinc-200 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
-                
-                {/* Left: Questions & Nav */}
-                {/* Left: Questions & Nav */}
-                <div className="flex items-center gap-2">
-                    <Tooltip title="Topic Questions">
-                        <button
-                            onClick={() => setDrawerOpen(true)}
-                            className="flex items-center gap-2 pl-2 pr-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 transition-all group"
-                        >
-                            <div className="w-6 h-6 rounded-md bg-white text-slate-700 flex items-center justify-center shadow-sm">
-                                <LucideList size={13} strokeWidth={2.5} />
-                            </div>
-                            <span className="text-xs font-bold text-slate-700">Questions</span>
-                        </button>
-                    </Tooltip>
-
-                    <div className="h-4 w-px bg-zinc-200 mx-1" />
-
-                    <div className="flex items-center bg-zinc-50 rounded-lg p-0.5 border border-zinc-100">
-                        <Tooltip title="Previous Question">
-                            <span>
-                                <IconButton
-                                    disabled={!prevQuestionId}
-                                    onClick={() => prevQuestionId && handleSwitchQuestion(prevQuestionId)}
-                                    size="small"
-                                    sx={{ 
-                                        borderRadius: '6px',
-                                        width: 24,
-                                        height: 24,
-                                        '&:hover': { bgcolor: 'white', shadow: 'sm', color: 'primary.main' }
-                                    }}
-                                >
-                                    <ChevronLeft size={16} />
-                                </IconButton>
-                            </span>
-                        </Tooltip>
-                        <Tooltip title="Next Question">
-                            <span>
-                                <IconButton
-                                    disabled={!nextQuestionId}
-                                    onClick={() => nextQuestionId && handleSwitchQuestion(nextQuestionId)}
-                                    size="small"
-                                    sx={{ 
-                                        borderRadius: '6px',
-                                        width: 24,
-                                        height: 24,
-                                        '&:hover': { bgcolor: 'white', shadow: 'sm', color: 'primary.main' }
-                                    }}
-                                >
-                                    <ChevronRight size={16} />
-                                </IconButton>
-                            </span>
-                        </Tooltip>
-                    </div>
-                </div>
-
-                {/* Right: Actions */}
-                <div className="flex items-center gap-3">
-                    <Button
-                        onClick={handleExit}
-                        variant="outlined"
-                        size="small"
-                        sx={{
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            borderRadius: '8px',
-                            color: 'text.secondary',
-                            borderColor: '#e2e8f0', // slate-200
-                            fontSize: '0.8rem',
-                            minWidth: 'auto',
-                            height: 32,
-                            px: 1.5,
-                            transition: 'all 0.2s',
-                            '&:hover': { 
-                                bgcolor: '#ff000082', 
-                                color: '#ef4444', // red-500
-                                borderColor: 'transparent',
-                                boxShadow: 'inset 0 0 0 1px #fee2e2' // subtle danger ring instead of hard border
-                            }
-                        }}
-                    >
-                        <LogOut size={14} className="mr-1.5" />
-                        Exit
-                    </Button>
-
-                    <div className="w-px h-4 bg-zinc-200" />
-
-                    <div className="flex items-center gap-1">
-                        <Tooltip title={isMaximized ? "Restore View" : "Maximize View"}>
-                            <IconButton 
-                                onClick={onMaximize} 
-                                size="small"
-                                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } }}
-                            >
-                                {isMaximized ? <WindowRestoreIcon size={18} /> : <WindowMaximizeIcon size={18} />}
-                            </IconButton>
-                        </Tooltip>
-                        
-                        {!isMaximized && (
-                            <Tooltip title="Collapse Panel">
-                                <IconButton 
-                                    onClick={onCollapse} 
-                                    size="small"
-                                    sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } }}
-                                >
-                                    {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-                                </IconButton>
-                            </Tooltip>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Content Spacing Wrapper */}
-            <div className="px-6 pt-3">
-
-            {/* Question Details Header - stacked layout */}
-            <div className="mb-6">
-                {/* Top Row: Meta & Actions */}
-                <div className="flex items-center gap-3 mb-3">
-                    {/* Number */}
-                    <div className="flex items-center justify-center h-6 px-2.5 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-600 font-mono text-xs font-bold shadow-sm">
-                        #{(topicQuestions?.findIndex(q => q.id.toString() === currentQuestionId.toString()) + 1 || 0).toString().padStart(2, '0')}
-                    </div>
-
-                    {/* Difficulty */}
-                    <div className={`h-6 flex items-center px-2.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
-                        question.difficulty === 'easy' 
-                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                            : question.difficulty === 'medium' 
-                                ? 'bg-amber-50 text-amber-600 border-amber-100' 
-                                : 'bg-rose-50 text-rose-600 border-rose-100'
-                    }`}>
-                        {question.difficulty}
-                    </div>
-                </div>
-
-                {/* Second Row: Title */}
-                <Typography component="h1" variant="h4" fontWeight={800} sx={{ color: '#1e293b', lineHeight: 1.25, fontSize: { xs: '1.25rem', md: '1.5rem' }, mb: 1 }}>
-                    {question.title}
-                </Typography>
-
-                {/* Third Row: Complexity (if available) */}
-                {(result?.time_complexity || result?.space_complexity) && (
-                    <div className="flex flex-wrap gap-2 text-xs font-medium text-zinc-500 mt-2">
-                         {result.time_complexity && (
-                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-50 text-zinc-600 border border-zinc-100">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                {result.time_complexity}
-                            </span>
-                        )}
-                        {result.space_complexity && (
-                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-50 text-zinc-600 border border-zinc-100">
-                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                                {result.space_complexity}
-                            </span>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* Modern Tabs (Segmented Control - Squared) */}
-            <div className="bg-zinc-100/80 p-1 rounded-lg flex gap-1 mb-2 self-start">
-                <button
-                    onClick={() => setLeftTab(0)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${leftTab === 0 ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/5' : 'text-zinc-500 hover:text-zinc-700'}`}
-                >
-                    Description
-                </button>
-                {question.constraints && (
+        <div className="bg-white z-10 border-b border-zinc-200 h-12 flex items-center justify-between px-4">
+            <div className="flex items-center gap-2">
+                <Tooltip title="Topic Questions">
                     <button
-                        onClick={() => setLeftTab(1)}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${leftTab === 1 ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/5' : 'text-zinc-500 hover:text-zinc-700'}`}
+                        onClick={() => setDrawerOpen(true)}
+                        className="flex items-center gap-2 pl-2 pr-3 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 transition-all group border border-slate-200/50"
                     >
-                        Constraints
+                        <div className="w-5 h-5 rounded-md bg-white text-slate-700 flex items-center justify-center shadow-sm">
+                            <LucideList size={11} strokeWidth={2.5} />
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Questions</span>
                     </button>
+                </Tooltip>
+
+                <div className="h-4 w-px bg-zinc-200 mx-1" />
+
+                <div className="flex items-center bg-zinc-50 rounded-lg p-0.5 border border-zinc-100">
+                    <IconButton
+                        disabled={!prevQuestionId}
+                        onClick={() => prevQuestionId && handleSwitchQuestion(prevQuestionId)}
+                        size="small"
+                        sx={{ width: 24, height: 24, borderRadius: '6px' }}
+                    >
+                        <ChevronLeft size={16} />
+                    </IconButton>
+                    <IconButton
+                        disabled={!nextQuestionId}
+                        onClick={() => nextQuestionId && handleSwitchQuestion(nextQuestionId)}
+                        size="small"
+                        sx={{ width: 24, height: 24, borderRadius: '6px' }}
+                    >
+                        <ChevronRight size={16} />
+                    </IconButton>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+                <Tooltip title={isMaximized ? "Restore View" : "Maximize View"}>
+                    <IconButton 
+                        onClick={onMaximize} 
+                        size="small"
+                        sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } }}
+                    >
+                        {isMaximized ? <WindowRestoreIcon size={16} /> : <WindowMaximizeIcon size={16} />}
+                    </IconButton>
+                </Tooltip>
+                
+                {!isMaximized && (
+                    <Tooltip title="Collapse Panel">
+                        <IconButton 
+                            onClick={onCollapse} 
+                            size="small"
+                            sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } }}
+                        >
+                            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                        </IconButton>
+                    </Tooltip>
                 )}
             </div>
-            </div> {/* Closing Content Spacing Wrapper */}
         </div>
     );
+
+
 
     const LeftContent = (
         <div className="h-full overflow-y-auto p-6 pt-6 no-scrollbar bg-white">
@@ -1210,6 +1089,20 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                 <Tooltip title={isMaximized ? "Restore" : "Maximize"}>
                     <IconButton onClick={onMaximize} size="small" sx={{ color: 'text.secondary', display: { xs: 'none', md: 'inline-flex' }, '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } }}>
                         {isMaximized ? <WindowRestoreIcon size={16} /> : <WindowMaximizeIcon size={16} />}
+                    </IconButton>
+                </Tooltip>
+
+                <Tooltip title="Editor Settings">
+                    <IconButton 
+                        onClick={handleSettingsClick} 
+                        size="small" 
+                        sx={{ 
+                            bgcolor: settingsAnchor ? 'primary.50' : 'transparent',
+                            color: settingsAnchor ? 'primary.main' : 'text.secondary',
+                            '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } 
+                        }}
+                    >
+                        <Settings size={18} />
                     </IconButton>
                 </Tooltip>
 
@@ -1379,7 +1272,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
                         borderRadius: '8px',
                         fontSize: '0.8rem',
                         px: { xs: 2, sm: 3 },
-                        height: 36,
+                        height: 34,
                         background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
                         boxShadow: '0 2px 5px rgba(79, 70, 229, 0.2)',
                         '&:hover': { boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)', background: 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)' }
@@ -1391,20 +1284,30 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
                 <div className="w-px h-5 bg-zinc-200 mx-1 hidden md:block" />
 
-                <Tooltip title="Editor Settings">
-                    <IconButton 
-                        onClick={handleSettingsClick} 
-                        size="small" 
-                        sx={{ 
-                            bgcolor: settingsAnchor ? 'primary.50' : 'transparent',
-                            color: settingsAnchor ? 'primary.main' : 'text.secondary',
-                            border: '1px solid',
-                            borderColor: settingsAnchor ? 'primary.100' : 'transparent',
-                            '&:hover': { color: 'primary.main', bgcolor: 'primary.50' } 
+                <Tooltip title="Exit Assessment">
+                    <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleExit}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            borderRadius: '8px',
+                            fontSize: '0.8rem',
+                            px: { xs: 2, sm: 3 },
+                            height: 34,
+                            background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                            boxShadow: '0 2px 5px rgba(225, 29, 72, 0.2)',
+                            color: 'white',
+                            '&:hover': { 
+                                boxShadow: '0 4px 12px rgba(225, 29, 72, 0.3)', 
+                                background: 'linear-gradient(135deg, #be123c 0%, #9f1239 100%)' 
+                            }
                         }}
                     >
-                        <Settings size={18} />
-                    </IconButton>
+                        <LogOut size={16} />
+                        <span className="hidden sm:inline ml-2">Exit</span>
+                    </Button>
                 </Tooltip>
 
             </div>
