@@ -7,6 +7,7 @@ import {
   ChevronRight, 
   ChevronDown, 
   ChevronUp,
+  GripVertical
 } from 'lucide-react';
 
 export const WindowMaximizeIcon = ({ size = 16 }: { size?: number }) => (
@@ -38,6 +39,13 @@ interface ThreePaneLayoutProps {
   renderRightBottomHeader?: (props: { isMaximized: boolean; isCollapsed: boolean; onMaximize: () => void; onCollapse: () => void }) => React.ReactNode;
   isBottomCollapsed?: boolean;
   onBottomCollapseChange?: (collapsed: boolean) => void;
+  maximizedPanel?: PaneType;
+  onMaximizePanelChange?: (panel: PaneType) => void;
+  onLayoutReset?: () => void;
+  leftWidth?: number;
+  onLeftWidthChange?: (width: number) => void;
+  rightTopHeight?: number;
+  onRightTopHeightChange?: (height: number) => void;
 }
 
 const TRANSITION: Transition = { 
@@ -59,11 +67,51 @@ export default function ThreePaneLayout({
   renderRightTopHeader,
   renderRightBottomHeader,
   isBottomCollapsed: controlledBottomCollapsed,
-  onBottomCollapseChange
+  onBottomCollapseChange,
+  maximizedPanel: controlledMaximizedPanel,
+  onMaximizePanelChange,
+  onLayoutReset,
+  leftWidth: controlledLeftWidth,
+  onLeftWidthChange,
+  rightTopHeight: controlledRightTopHeight,
+  onRightTopHeightChange
 }: ThreePaneLayoutProps) {
-  const [maximizedPanel, setMaximizedPanel] = useState<PaneType>('none');
+  const [internalMaximizedPanel, setInternalMaximizedPanel] = useState<PaneType>('none');
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
   const [internalBottomCollapsed, setInternalBottomCollapsed] = useState(false);
+  const [internalLeftWidth, setInternalLeftWidth] = useState(40);
+  const [internalRightTopHeight, setInternalRightTopHeight] = useState(55);
+
+  const leftWidth = controlledLeftWidth !== undefined ? controlledLeftWidth : internalLeftWidth;
+  const setLeftWidth = (width: number) => {
+    if (onLeftWidthChange) onLeftWidthChange(width);
+    else setInternalLeftWidth(width);
+  };
+
+  const rightTopHeight = controlledRightTopHeight !== undefined ? controlledRightTopHeight : internalRightTopHeight;
+  const setRightTopHeight = (height: number) => {
+    if (onRightTopHeightChange) onRightTopHeightChange(height);
+    else setInternalRightTopHeight(height);
+  };
+
+  const maximizedPanel = controlledMaximizedPanel !== undefined ? controlledMaximizedPanel : internalMaximizedPanel;
+  const setMaximizedPanel = (panel: PaneType | ((prev: PaneType) => PaneType)) => {
+    if (onMaximizePanelChange) {
+      if (typeof panel === 'function') {
+        onMaximizePanelChange(panel(maximizedPanel));
+      } else {
+        onMaximizePanelChange(panel);
+      }
+    } else {
+      setInternalMaximizedPanel(panel);
+    }
+    
+    // If we are restoring, notify parent so it can adjust sizes if needed
+    const nextPanel = typeof panel === 'function' ? panel(maximizedPanel) : panel;
+    if (nextPanel === 'none' && onLayoutReset) {
+      onLayoutReset();
+    }
+  };
 
   const isBottomCollapsed = controlledBottomCollapsed !== undefined ? controlledBottomCollapsed : internalBottomCollapsed;
   const setIsBottomCollapsed = (collapsed: boolean) => {
@@ -73,8 +121,6 @@ export default function ThreePaneLayout({
       setInternalBottomCollapsed(collapsed);
     }
   };
-  const [leftWidth, setLeftWidth] = useState(40);
-  const [rightTopHeight, setRightTopHeight] = useState(55);
   const [isResizing, setIsResizing] = useState<'vertical' | 'horizontal' | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -125,10 +171,73 @@ export default function ThreePaneLayout({
     customRender?: (props: any) => React.ReactNode
   ) => {
     const isMaximized = maximizedPanel === panel;
-    const onMaximize = () => setMaximizedPanel(prev => prev === panel ? 'none' : panel);
+    const isAnyMaximized = maximizedPanel !== 'none';
+    const isAutoMinimized = isAnyMaximized && !isMaximized;
+    const isSmall = isCollapsed || isAutoMinimized;
     
-    // If we are collapsed, we don't show the custom header because it's usually too wide
-    if (customRender && !isCollapsed && maximizedPanel === 'none' || (customRender && isMaximized)) {
+    const onMaximize = () => setMaximizedPanel(prev => prev === panel ? 'none' : panel);
+    const onRestore = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setMaximizedPanel('none');
+      if (isCollapsed) onCollapse();
+    };
+    
+    // If we are small (manually collapsed or auto-minimized), show ultra-minimal UI
+    if (isSmall) {
+      const isNarrowStrip = panel === 'left' || maximizedPanel === 'left';
+      
+      const handleBackgroundClick = () => {
+        if (isAutoMinimized) {
+          onMaximize();
+        } else if (isCollapsed) {
+          onCollapse();
+        }
+      };
+
+      if (isNarrowStrip) {
+        return (
+          <div 
+            onClick={handleBackgroundClick}
+            className="flex flex-col items-center justify-start py-6 w-full h-full bg-slate-50/80 border-r border-slate-200/60 cursor-pointer hover:bg-white transition-all gap-8 overflow-hidden select-none group"
+          >
+             <button 
+                onClick={onRestore}
+                title="Restore Workspace"
+                className="p-1.5 bg-white rounded-md text-slate-400 hover:text-indigo-600 hover:scale-110 shadow-sm border border-slate-200/60 transition-all active:scale-90"
+              >
+                <WindowRestoreIcon size={12} />
+              </button>
+              <div className="[writing-mode:vertical-lr] flex items-center gap-2">
+                <span className="text-[9px] font-black text-slate-400 group-hover:text-slate-600 uppercase tracking-[0.2em] whitespace-nowrap transition-colors">
+                  {defaultTitle}
+                </span>
+              </div>
+          </div>
+        );
+      } else {
+        return (
+          <div 
+            onClick={handleBackgroundClick}
+            className="flex items-center justify-between px-4 h-10 bg-slate-50/80 border-b border-slate-200/60 cursor-pointer hover:bg-white transition-all select-none group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-black text-slate-400 group-hover:text-slate-600 uppercase tracking-[0.2em]">
+                {defaultTitle}
+              </span>
+            </div>
+            <button 
+              onClick={onRestore}
+              title="Restore Workspace"
+              className="p-1.5 bg-white rounded-md text-slate-400 hover:text-indigo-600 hover:scale-110 shadow-sm border border-slate-200/60 transition-all active:scale-90"
+            >
+              <WindowRestoreIcon size={12} />
+            </button>
+          </div>
+        );
+      }
+    }
+
+    if (customRender) {
       return customRender({ isMaximized, isCollapsed, onMaximize, onCollapse });
     }
 
@@ -176,15 +285,32 @@ export default function ThreePaneLayout({
 
   // Determine widths and heights for animation
   const getLayoutStyles = () => {
-    if (maximizedPanel === 'left') return { left: '100%', right: '0%', top: '100%', bottom: '0%' };
-    if (maximizedPanel === 'editor') return { left: '0%', right: '100%', top: '100%', bottom: '0%' };
-    if (maximizedPanel === 'output') return { left: '0%', right: '100%', top: '0%', bottom: '100%' };
+    const MIN_SIZE = '40px';
+    
+    if (maximizedPanel === 'left') return { 
+      left: `calc(100% - ${MIN_SIZE})`, 
+      right: MIN_SIZE, 
+      top: '50%', 
+      bottom: '50%' 
+    };
+    if (maximizedPanel === 'editor') return { 
+      left: MIN_SIZE, 
+      right: `calc(100% - ${MIN_SIZE})`, 
+      top: `calc(100% - ${MIN_SIZE})`, 
+      bottom: MIN_SIZE 
+    };
+    if (maximizedPanel === 'output') return { 
+      left: MIN_SIZE, 
+      right: `calc(100% - ${MIN_SIZE})`, 
+      top: MIN_SIZE, 
+      bottom: `calc(100% - ${MIN_SIZE})` 
+    };
     
     return { 
-      left: isLeftCollapsed ? '48px' : `${leftWidth}%`, 
-      right: isLeftCollapsed ? 'calc(100% - 48px)' : `${100 - leftWidth}%`, 
-      top: isBottomCollapsed ? 'calc(100% - 48px)' : `${rightTopHeight}%`, 
-      bottom: isBottomCollapsed ? '48px' : `${100 - rightTopHeight}%` 
+      left: isLeftCollapsed ? MIN_SIZE : `${leftWidth}%`, 
+      right: isLeftCollapsed ? `calc(100% - ${MIN_SIZE})` : `${100 - leftWidth}%`, 
+      top: isBottomCollapsed ? `calc(100% - ${MIN_SIZE})` : `${rightTopHeight}%`, 
+      bottom: isBottomCollapsed ? MIN_SIZE : `${100 - rightTopHeight}%` 
     };
   };
 
@@ -200,30 +326,18 @@ export default function ThreePaneLayout({
         transition={TRANSITION}
         className="flex flex-col h-full bg-white relative overflow-hidden shrink-0 border-r border-slate-200/60 z-10"
       >
-        <div className="flex-1 flex flex-col min-w-[48px] h-full overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-[0px] h-full overflow-hidden">
           {renderHeaderUI('left', leftTitle, isLeftCollapsed, () => setIsLeftCollapsed(!isLeftCollapsed), renderLeftHeader)}
           <motion.div 
             animate={{ 
               opacity: isLeftCollapsed || (maximizedPanel !== 'none' && maximizedPanel !== 'left') ? 0 : 1,
-              x: isLeftCollapsed ? -20 : 0
+              x: (isLeftCollapsed || (maximizedPanel !== 'none' && maximizedPanel !== 'left')) ? -20 : 0
             }}
             transition={{ duration: 0.2 }}
             className="flex-1 overflow-hidden"
           >
             {leftContent}
           </motion.div>
-          
-          {isLeftCollapsed && maximizedPanel === 'none' && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              onClick={() => setIsLeftCollapsed(false)} 
-              className="absolute inset-x-0 bottom-0 top-12 flex flex-col items-center py-6 cursor-pointer hover:bg-slate-50 transition-colors gap-6 group"
-            >
-              <div className="w-1.5 h-32 bg-slate-100 rounded-full group-hover:bg-indigo-100 transition-colors" />
-              <div className="[writing-mode:vertical-lr] text-[10px] font-black text-slate-300 group-hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">Expand {leftTitle}</div>
-            </motion.div>
-          )}
         </div>
       </motion.div>
 
@@ -232,12 +346,20 @@ export default function ThreePaneLayout({
         animate={{ 
           opacity: maximizedPanel === 'none' && !isLeftCollapsed ? 1 : 0,
           pointerEvents: maximizedPanel === 'none' && !isLeftCollapsed ? 'auto' : 'none',
-          width: maximizedPanel === 'none' && !isLeftCollapsed ? '4px' : '0px'
+          width: maximizedPanel === 'none' && !isLeftCollapsed ? '10px' : '0px'
         }}
         onMouseDown={startResize('vertical')}
-        className="bg-blue-100 hover:bg-indigo-500/10 cursor-col-resize transition-all z-20 shrink-0 flex items-center justify-center group"
+        className={`relative hover:bg-slate-50/50 cursor-col-resize transition-all z-30 shrink-0 flex items-center justify-center group ${isResizing === 'vertical' ? 'bg-slate-100/50' : ''}`}
       >
-        <div className="w-0.5 h-16 bg-slate-200 rounded-full group-hover:bg-indigo-400/50 transition-all group-hover:scale-x-150" />
+        <div className={`w-px h-full transition-all duration-300 ${isResizing === 'vertical' ? 'bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.3)]' : 'bg-slate-200/60 group-hover:bg-indigo-400/40'}`} />
+        
+        <div className={`
+          absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-10 bg-zinc-900 rounded-full 
+          transition-all duration-300 flex items-center justify-center shadow-lg shadow-zinc-900/40
+          ${isResizing === 'vertical' ? 'opacity-100 scale-y-110' : 'opacity-0 group-hover:opacity-100 scale-y-75 group-hover:scale-y-100'}
+        `}>
+          <GripVertical size={10} strokeWidth={3} className="text-white/90" />
+        </div>
       </motion.div>
 
       {/* RIGHT CONTAINER */}
@@ -256,7 +378,10 @@ export default function ThreePaneLayout({
           <div className="flex-1 flex flex-col min-h-[0px] h-full overflow-hidden">
              {renderHeaderUI('editor', rightTopTitle, false, () => {}, renderRightTopHeader)}
              <motion.div 
-               animate={{ opacity: maximizedPanel === 'output' ? 0 : 1 }}
+               animate={{ 
+                 opacity: (maximizedPanel !== 'none' && maximizedPanel !== 'editor') ? 0 : 1,
+                 pointerEvents: (maximizedPanel !== 'none' && maximizedPanel !== 'editor') ? 'none' : 'auto'
+               }}
                transition={{ duration: 0.2 }}
                className="flex-1 overflow-hidden relative"
              >
@@ -270,12 +395,20 @@ export default function ThreePaneLayout({
           animate={{ 
             opacity: maximizedPanel === 'none' && !isBottomCollapsed ? 1 : 0,
             pointerEvents: maximizedPanel === 'none' && !isBottomCollapsed ? 'auto' : 'none',
-            height: maximizedPanel === 'none' && !isBottomCollapsed ? '4px' : '0px'
+            height: maximizedPanel === 'none' && !isBottomCollapsed ? '10px' : '0px'
           }}
           onMouseDown={startResize('horizontal')}
-          className="bg-blue-100 hover:bg-indigo-500/10 cursor-row-resize transition-all z-20 flex items-center justify-center group"
+          className={`relative hover:bg-slate-50/50 cursor-row-resize transition-all z-30 flex items-center justify-center group ${isResizing === 'horizontal' ? 'bg-slate-100/50' : ''}`}
         >
-          <div className="h-0.5 w-32 bg-slate-200 rounded-full group-hover:bg-indigo-400/50 transition-all group-hover:scale-y-150" />
+          <div className={`h-px w-full transition-all duration-300 ${isResizing === 'horizontal' ? 'bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.3)]' : 'bg-slate-200/60 group-hover:bg-indigo-400/40'}`} />
+          
+          <div className={`
+            absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-1.5 w-10 bg-zinc-900 rounded-full 
+            transition-all duration-300 flex items-center justify-center shadow-lg shadow-zinc-900/40
+            ${isResizing === 'horizontal' ? 'opacity-100 scale-x-110' : 'opacity-0 group-hover:opacity-100 scale-x-75 group-hover:scale-x-100'}
+          `}>
+            <GripVertical size={10} strokeWidth={3} className="text-white/90 rotate-90" />
+          </div>
         </motion.div>
 
         {/* BOTTOM PANE (OUTPUT) */}
@@ -284,11 +417,12 @@ export default function ThreePaneLayout({
           transition={TRANSITION}
           className="flex flex-col bg-white overflow-hidden shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)] relative z-10"
         >
-          <div className="flex-1 flex flex-col min-h-[48px] h-full overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-[0px] h-full overflow-hidden">
             {renderHeaderUI('output', rightBottomTitle, isBottomCollapsed, () => setIsBottomCollapsed(!isBottomCollapsed), renderRightBottomHeader)}
             <motion.div 
               animate={{ 
-                opacity: isBottomCollapsed || maximizedPanel === 'editor' ? 0 : 1,
+                opacity: (isBottomCollapsed || (maximizedPanel !== 'none' && maximizedPanel !== 'output')) ? 0 : 1,
+                pointerEvents: (isBottomCollapsed || (maximizedPanel !== 'none' && maximizedPanel !== 'output')) ? 'none' : 'auto',
                 y: isBottomCollapsed ? 20 : 0
               }}
               transition={{ duration: 0.2 }}

@@ -176,6 +176,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [activeTab, setActiveTab] = useState(0); // 0: Output, 1: Tests
     const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
+    const [maximizedPanel, setMaximizedPanel] = useState<'none' | 'left' | 'editor' | 'output'>('none');
     const [leftTab, setLeftTab] = useState(0); // 0: Description, 1: Constraints
 
     const [code, setCode] = useState("");
@@ -203,6 +204,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     const [wordWrap, setWordWrap] = useState(true);
     const [autoClosingBrackets, setAutoClosingBrackets] = useState(true);
 
+    const [leftWidth, setLeftWidth] = useState(40);
+    const [rightTopHeight, setRightTopHeight] = useState(55);
     const [lastRunCode, setLastRunCode] = useState("");
     const [runCooldown, setRunCooldown] = useState(0);
 
@@ -668,6 +671,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
 
             setActiveTab(1);
             setIsBottomCollapsed(false);
+            setRightTopHeight(50); // Balanced 50/50 split when submitting
+            setMaximizedPanel('none'); // Restore layout to show output
             toast.success("Solution submitted successfully!");
 
         } catch (e: any) {
@@ -709,6 +714,8 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
             setResult(null);
             setActiveTab(1); // Show Tests Tab
             setIsBottomCollapsed(false); // Ensure panel is open
+            setRightTopHeight(50); // Force 50/50 split when running
+            setMaximizedPanel('none'); // Restore layout to show output
 
             const langMap: Record<string, string> = {
                 python: "1", java: "2", c: "3", cpp: "4", "c++": "4", javascript: "10", js: "10", node: "10", php: "1"
@@ -1187,7 +1194,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     );
 
     const renderRightTopHeader = ({ isMaximized, onMaximize }: any) => (
-        <div className="h-14 md:h-12 bg-white flex items-center justify-between px-2 md:px-4 shrink-0 z-20 border-b border-zinc-100/50">
+        <div className="h-14 md:h-12 bg-white flex items-center justify-between px-2 md:px-4 shrink-0 z-20 border-b border-zinc-200">
             <div className="flex items-center gap-2 md:gap-3">
                 <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 hidden sm:flex">
                     <Code2 size={16} strokeWidth={2.5} />
@@ -1436,7 +1443,7 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
     );
 
     const renderRightBottomHeader = ({ isMaximized, isCollapsed, onMaximize, onCollapse }: any) => (
-        <div className="flex items-center justify-between border-b border-zinc-100 px-4 h-12 bg-white shrink-0">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-4 h-12 bg-white shrink-0">
             <div className="flex bg-zinc-200/80 p-1 rounded-lg gap-1">
                 <button
                     onClick={() => setActiveTab(0)}
@@ -1877,6 +1884,16 @@ const CodeRunnerInterface: React.FC<CodeRunnerInterfaceProps> = ({
         renderRightBottomHeader={renderRightBottomHeader}
         isBottomCollapsed={isBottomCollapsed}
         onBottomCollapseChange={setIsBottomCollapsed}
+        maximizedPanel={maximizedPanel}
+        onMaximizePanelChange={setMaximizedPanel}
+        leftWidth={leftWidth}
+        onLeftWidthChange={setLeftWidth}
+        rightTopHeight={rightTopHeight}
+        onRightTopHeightChange={setRightTopHeight}
+        onLayoutReset={() => {
+            setRightTopHeight(50);
+            setLeftWidth(40); // Restore to default balance
+        }}
       />
       
     {/* VISUALIZER DIALOG */}
